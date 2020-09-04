@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"io"
 	"log"
 	"net"
@@ -14,9 +12,7 @@ import (
 
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 
-	"github.com/google/go-github/v29/github"
 	"go.uber.org/zap"
-	"golang.org/x/oauth2"
 	ddhttp "gopkg.in/DataDog/dd-trace-go.v1/contrib/net/http"
 )
 
@@ -129,15 +125,11 @@ func setupTracing(logger *zap.Logger) *Tracing {
 }
 
 type config struct {
-	GithubToken string
-	SlackSecret string
-	ListenAddr  string
+	ListenAddr string
 }
 
 func getConfig() config {
 	return config{
-		GithubToken: os.Getenv("GITHUB_TOKEN"),
-		SlackSecret: os.Getenv("SLACK_SECRET"),
 		// Defaults to ":8080"
 		ListenAddr: os.Getenv("LISTEN_ADDR"),
 	}
@@ -148,13 +140,7 @@ func main() {
 	zapLogger := setupLogging()
 	zapLogger.Info("Starting")
 	rootTracer := setupTracing(zapLogger.With(zap.String("section", "setup_tracing")))
-	rb, err := newReviewBot(cfg.GithubToken, zapLogger, rootTracer)
-	if err != nil {
-		fmt.Println("Unable to make basic review bot")
-		os.Exit(1)
-		return
-	}
-	ss := setupServer(cfg, zapLogger, rb, rootTracer)
+	ss := setupServer(cfg, zapLogger, rootTracer)
 	listenErr := ss.ListenAndServe()
 	logIfErr(zapLogger, listenErr, "server exited")
 	zapLogger.Info("Server finished")
@@ -163,94 +149,13 @@ func main() {
 	}
 }
 
-type Reviewbot struct {
-	authUser       *github.User
-	client         *github.Client
-	logger         ContextZapLogger
-	defaultTimeout time.Duration
-}
-
-func newReviewBot(token string, zapLogger *zap.Logger, rootTracer *Tracing) (*Reviewbot, error) {
-	ctx := context.Background()
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: token},
-	)
-	tc := oauth2.NewClient(ctx, ts)
-	tc.Transport = rootTracer.WrapRoundTrip(tc.Transport)
-	client := github.NewClient(tc)
-	authUser, _, err := client.Users.Get(ctx, "")
-	if err != nil {
-		zapLogger.Error("unable to get an authenticated user", zap.Error(err))
-		return nil, err
-	}
-	return &Reviewbot{
-		authUser:       authUser,
-		client:         client,
-		logger:         ContextZapLogger{zapLogger},
-		defaultTimeout: time.Second * 5,
-	}, nil
-}
-
-func (r *Reviewbot) acceptReview(ctx context.Context, owner string, repo string, prNumber int, acceptMsg string) error {
-	funcLogger := r.logger.With(ctx).With(zap.String("owner", owner), zap.String("repo", repo), zap.Int("pr", prNumber))
-	funcLogger.Info("Asked to accept review")
-	if r.defaultTimeout != 0 {
-		var onEnd func()
-		ctx, onEnd = context.WithTimeout(ctx, r.defaultTimeout)
-		defer onEnd()
-	}
-	pr, _, err := r.client.PullRequests.Get(ctx, owner, repo, prNumber)
-	if err != nil {
-		funcLogger.Error("unable to get pull requests", zap.Error(err))
-		return err
-	}
-	if !isRequestedReviewer(r.authUser, pr.RequestedReviewers) {
-		funcLogger.Warn("expected to accept, but not a reviewer")
-		return errors.New("not a reviewer")
-	}
-	_, _, err = r.client.PullRequests.CreateReview(ctx, owner, repo, prNumber, &github.PullRequestReviewRequest{
-		Body:  &acceptMsg,
-		Event: github.String("APPROVE"),
-	})
-	if err != nil {
-		funcLogger.Error("unable to accept review", zap.Error(err))
-		return err
-	}
-	funcLogger.Info("Accepted review")
-	return nil
-}
-
-func isRequestedReviewer(exp *github.User, users []*github.User) bool {
-	for _, u := range users {
-		if *u.ID == *exp.ID {
-			return true
-		}
-	}
-	return false
-}
-
-func setupServer(cfg config, z *zap.Logger, rb *Reviewbot, rootTracer *Tracing) *http.Server {
-	ar := &acceptReviewHandler{
-		rb:     rb,
-		logger: ContextZapLogger{z.With(zap.String("handler", "accept_review"))},
-	}
-	sv := &slackVerifier{
-		expectedToken: cfg.SlackSecret,
-		logger:        ContextZapLogger{z.With(zap.String("handler", "slack_verifier"))},
-	}
-	ss := slackServer{
-		handlers: map[string]SlashHandler{
-			"accept": ar,
-		},
-		logger: ContextZapLogger{z.With(zap.String("handler", "slack_server"))},
-	}
+func setupServer(cfg config, z *zap.Logger, rootTracer *Tracing) *http.Server {
 	mux := rootTracer.CreateRootMux()
 	mux.HandleFunc("/", func(rw http.ResponseWriter, req *http.Request) {
 		(&ContextZapLogger{z}).With(req.Context()).With(zap.String("handler", "not_found"), zap.String("url", req.URL.String())).Warn("unknown request")
 		http.NotFoundHandler().ServeHTTP(rw, req)
 	})
 	mux.Handle("/health", HealthHandler(z.With(zap.String("handler", "health"))))
-	mux.Handle("/slack", sv.WithHandler(&ss))
 	listenAddr := cfg.ListenAddr
 	if listenAddr == "" {
 		listenAddr = ":8080"
@@ -267,4 +172,17 @@ func HealthHandler(z *zap.Logger) http.Handler {
 		_, err := io.WriteString(rw, "OK")
 		logIfErr(z, err, "unable to write back health response")
 	})
+}
+
+func logIfErr(logger *zap.Logger, err error, s string) {
+	if err != nil {
+		logger.Error(s, zap.Error(err))
+	}
+}
+func attachTag(ctx context.Context, key string, value interface{}) {
+	sp, ok := tracer.SpanFromContext(ctx)
+	if !ok {
+		return
+	}
+	sp.SetTag(key, value)
 }

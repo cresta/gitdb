@@ -28,7 +28,7 @@ RUN go mod verify
 
 
 RUN make build test lint
-RUN GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o /go/bin/reviewbot -ldflags '-extldflags "-f no-PIC -static"' -tags 'osusergo netgo static_build'
+RUN GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o /go/bin/gitdb -ldflags '-extldflags "-f no-PIC -static"' -tags 'osusergo netgo static_build'
 
 FROM scratch
 # Import from builder.
@@ -38,10 +38,10 @@ COPY --from=builder /etc/group /etc/group
 COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 
 # Copy our static executable
-COPY --from=builder /go/bin/reviewbot /go/bin/reviewbot
+COPY --from=builder /go/bin/gitdb /go/bin/gitdb
 # Use an unprivileged user.
 USER appuser:appuser
 
 EXPOSE 8080
 # Run the hello binary.
-ENTRYPOINT ["/go/bin/reviewbot"]
+ENTRYPOINT ["/go/bin/gitdb"]
