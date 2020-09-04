@@ -59,7 +59,7 @@ func (t *Tracing) CreateRootMux() CoreMux {
 	if t == nil {
 		return http.NewServeMux()
 	}
-	return ddhttp.NewServeMux(ddhttp.WithServiceName("reviewbot"))
+	return ddhttp.NewServeMux(ddhttp.WithServiceName("gitdb"))
 }
 
 func fileExists(filename string) bool {
