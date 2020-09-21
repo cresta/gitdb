@@ -4,16 +4,14 @@ import (
 	"context"
 	"go.uber.org/zap"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
-	"log"
 )
 
-func setupLogging() *zap.Logger {
+func setupLogging() (*zap.Logger, error) {
 	l, err := zap.NewProduction()
 	if err != nil {
-		log.Println("Unable to setup zap logger")
-		panic(err)
+		return nil, err
 	}
-	return l
+	return l, nil
 }
 
 type ContextZapLogger struct {

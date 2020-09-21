@@ -6,6 +6,7 @@ require (
 	github.com/DataDog/datadog-go v4.0.0+incompatible // indirect
 	github.com/go-git/go-git/v5 v5.1.0
 	github.com/google/uuid v1.1.2 // indirect
+	github.com/gorilla/mux v1.8.0
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/philhofer/fwd v1.0.0 // indirect
 	github.com/stretchr/testify v1.4.0

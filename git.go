@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"go.uber.org/zap"
 	"io"
@@ -13,8 +15,8 @@ type gitOperator struct {
 	log *zap.Logger
 }
 
-func (g *gitOperator) clone(ctx context.Context, into string, remoteURL string) (Checkout, error) {
-	repo, err := git.PlainCloneContext(ctx, into, false, &git.CloneOptions{
+func (g *gitOperator) clone(ctx context.Context, into string, remoteURL string) (*gitCheckout, error) {
+	repo, err := git.PlainCloneContext(ctx, into, true, &git.CloneOptions{
 		URL:   remoteURL,
 		Depth: 1,
 	})
@@ -22,27 +24,67 @@ func (g *gitOperator) clone(ctx context.Context, into string, remoteURL string) 
 		return nil, err
 	}
 	return &gitCheckout{
-		repo:    repo,
-		absPath: into,
-		log:     g.log.With(zap.String("repo", remoteURL)),
+		repo:      repo,
+		absPath:   into,
+		remoteURL: remoteURL,
+		log:       g.log.With(zap.String("repo", remoteURL)),
 	}, nil
 }
 
 type gitCheckout struct {
-	absPath string
-	repo    *git.Repository
-	log     *zap.Logger
+	absPath   string
+	repo      *git.Repository
+	log       *zap.Logger
+	ref       *plumbing.Reference
+	remoteURL string
 }
 
-type Checkout interface {
-	LsFiles() ([]string, error)
-	FileContent(fileName string) (io.WriterTo, error)
+func (g *gitCheckout) Refresh(ctx context.Context) error {
+	err := g.repo.FetchContext(ctx, &git.FetchOptions{})
+	if err == nil || errors.Is(err, git.NoErrAlreadyUpToDate) {
+		return nil
+	}
+	return fmt.Errorf("unable to refresh repository: %v", err)
+}
+
+func (g *gitCheckout) AbsPath() string {
+	return g.absPath
+}
+
+func (g *gitCheckout) reference() (*plumbing.Reference, error) {
+	if g.ref != nil {
+		return g.ref, nil
+	}
+	return g.repo.Head()
+}
+
+func (g *gitCheckout) RemoteExists(remote string) bool {
+	r, err := g.repo.Remote(remote)
+	if err != nil {
+		return false
+	}
+	return r != nil
+}
+
+func (g *gitCheckout) WithReference(refName string) (*gitCheckout, error) {
+	r, err := g.repo.Reference(plumbing.ReferenceName(refName), true)
+	if err != nil {
+		return nil, fmt.Errorf("unable to resolve ref %s: %v", refName, err)
+	}
+	g.log.Info("Switched hash", zap.String("hash", r.Hash().String()))
+	return &gitCheckout{
+		absPath:   g.absPath,
+		remoteURL: g.remoteURL,
+		repo:      g.repo,
+		log:       g.log.With(zap.String("ref", refName)),
+		ref:       r,
+	}, nil
 }
 
 func (g *gitCheckout) LsFiles() ([]string, error) {
 	g.log.Info("asked to list files")
 	defer g.log.Info("list done")
-	w, err := g.repo.Head()
+	w, err := g.reference()
 	if err != nil {
 		return nil, fmt.Errorf("unable to get repo head: %v", err)
 	}
@@ -67,7 +109,7 @@ func (g *gitCheckout) LsFiles() ([]string, error) {
 func (g *gitCheckout) FileContent(fileName string) (io.WriterTo, error) {
 	g.log.Info("asked to fetch file", zap.String("file_name", fileName))
 	defer g.log.Info("fetch done")
-	w, err := g.repo.Head()
+	w, err := g.reference()
 	if err != nil {
 		return nil, fmt.Errorf("unable to get repo head: %v", err)
 	}
