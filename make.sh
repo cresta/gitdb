@@ -4,7 +4,6 @@ set -ue -o pipefail
 if [ "${DEBUG-}" == "true" ]; then
   set -x
 fi
-set -x
 
 # Repo is part of the image name for this build (repo=repository)
 REPO=${CIRCLE_PROJECT_USERNAME-cresta}/${CIRCLE_PROJECT_REPONAME-gitdb}

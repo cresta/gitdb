@@ -1,7 +1,8 @@
 ARG BUILDER_IMAGE
+# hadolint ignore=DL3006
 FROM ${BUILDER_IMAGE} as builder
 RUN mkdir /empty_dir
-ADD . /work
+COPY . /work
 RUN ./make.sh build
 
 FROM scratch

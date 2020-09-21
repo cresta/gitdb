@@ -46,12 +46,12 @@ type getFileResp struct {
 }
 
 type CanHTTPWrite interface {
-	HttpWrite(w http.ResponseWriter, l *zap.Logger)
+	HTTPWrite(w http.ResponseWriter, l *zap.Logger)
 }
 
 var _ CanHTTPWrite = &getFileResp{}
 
-func (g *getFileResp) HttpWrite(w http.ResponseWriter, l *zap.Logger) {
+func (g *getFileResp) HTTPWrite(w http.ResponseWriter, l *zap.Logger) {
 	w.WriteHeader(g.code)
 	if w != nil {
 		if _, err := g.msg.WriteTo(w); err != nil {
@@ -61,7 +61,7 @@ func (g *getFileResp) HttpWrite(w http.ResponseWriter, l *zap.Logger) {
 }
 
 func (h *checkoutHandler) genericHandler(resp CanHTTPWrite, w http.ResponseWriter, l *zap.Logger) {
-	resp.HttpWrite(w, l)
+	resp.HTTPWrite(w, l)
 }
 
 func (h *checkoutHandler) refreshAllRepoHandler(w http.ResponseWriter, req *http.Request) {

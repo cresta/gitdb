@@ -160,7 +160,7 @@ func getRepoKey(repo string) string {
 	return parts2[0]
 }
 
-func setupServer(cfg config, z *zap.Logger, rootTracer *Tracing, coHandler *checkoutHandler) *http.Server {
+func setupServer(cfg config, z *zap.Logger, rootTracer *Tracing, coHandler http.Handler) *http.Server {
 	mux := rootTracer.CreateRootMux()
 	mux.Handle("/health", HealthHandler(z.With(zap.String("handler", "health"))))
 	mux.Handle("/", coHandler)
