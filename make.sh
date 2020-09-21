@@ -4,14 +4,16 @@ set -ue -o pipefail
 if [ "${DEBUG-}" == "true" ]; then
   set -x
 fi
+set -x
 
 # Repo is part of the image name for this build (repo=repository)
 REPO=${CIRCLE_PROJECT_USERNAME-cresta}/${CIRCLE_PROJECT_REPONAME-gitdb}
 # Tag is the image tag of this build's docker file
-TAG=${TAG-${GIT_COMMIT-latest}}
+TAG=${TAG-${CIRCLE_SHA1-latest}}
 # The docker image is the repository and tag together
 IMAGE=${REPO}:${TAG}
 BUILDER_IMAGE=builder-gitdb:${TAG}-builder
+VOLUME=mount-${CIRCLE_PROJECT_REPONAME-default}
 
 # App is the name of the docker container we execute in dockerrun
 APP=check-${CIRCLE_PROJECT_REPONAME-app}
