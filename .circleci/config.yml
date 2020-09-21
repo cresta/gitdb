@@ -14,8 +14,17 @@ jobs:
           name: Make Docker tag
           command: mkdir ./out && echo ${DOCKER_HUB_URL-quay.io}/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}:${CIRCLE_BRANCH}-$(date -u +"%Y%m%dT%H%M%SZ")-$(echo $CIRCLE_SHA1 | cut -c -7) > ./out/docker_tag && cat ./out/docker_tag
       - run:
+          name: Make builder
+          command: make.sh build_builder
+      - run:
+          name: Lint
+          command: make.sh dockerrun lint
+      - run:
+          name: test
+          command: make.sh dockerrun test
+      - run:
           name: Build docker image
-          command: docker build -t $(cat ./out/docker_tag) .
+          command: TAG=$(cat ./out/docker_tag) make.sh build_docker
       - run:
           name: Save docker image
           command: docker save $(cat ./out/docker_tag) | gzip > ./out/image.tar.gz
