@@ -1,15 +1,10 @@
 FROM golang:1.15.0-buster AS builder
 # Install git.
-# Git is required for fetching the dependencies.
-# RUN apt-get update && \
-# 	apt-get install -y --no-install-recommends \
-# 		ca-certificates=20* \
-# 		gcc=4:8* \
-#        		git=1:2* \
-# 		libc-dev  \
-# 		make=4.* \
-# 	       	tzdata && \
-# 	rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    # For tar.xz below
+    xz-utils && \
+    rm -rf /var/lib/apt/lists/*
 WORKDIR /work
 # Create appuser
 ENV USER=appuser
