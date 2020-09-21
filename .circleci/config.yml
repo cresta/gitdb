@@ -18,13 +18,13 @@ jobs:
           command: make.sh build_builder
       - run:
           name: Lint
-          command: make.sh dockerrun lint
+          command: ./make.sh dockerrun lint
       - run:
           name: test
-          command: make.sh dockerrun test
+          command: ./make.sh dockerrun test
       - run:
           name: Build docker image
-          command: TAG=$(cat ./out/docker_tag) make.sh build_docker
+          command: TAG=$(cat ./out/docker_tag) ./make.sh build_docker
       - run:
           name: Save docker image
           command: docker save $(cat ./out/docker_tag) | gzip > ./out/image.tar.gz
