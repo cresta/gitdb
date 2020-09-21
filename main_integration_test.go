@@ -5,7 +5,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"io"
 	"io/ioutil"
 	"net"
@@ -13,6 +12,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestServer(t *testing.T) {

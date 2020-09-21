@@ -3,13 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
-	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
 	"strings"
+
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 
 	"go.uber.org/zap"
 )

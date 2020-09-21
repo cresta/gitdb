@@ -3,13 +3,14 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"strings"
+
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
-	"io"
-	"net/http"
-	"strings"
 )
 
 type checkoutHandler struct {

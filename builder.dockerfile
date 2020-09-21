@@ -24,8 +24,9 @@ RUN curl -L -o /tmp/golangci.tar.gz "https://github.com/golangci/golangci-lint/r
 
 # Install shellcheck
 ARG SHELLCHECK_VERSION=v0.7.1
+RUN apt-get update && apt-get install -y xz-utils
 RUN curl -L -o /tmp/shellcheck.tar.xz "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" && \
-	tar -C /tmp -xJv < /tmp/shellcheck.tar.xz && \
+    tar -C /tmp -xJv < /tmp/shellcheck.tar.xz && \
 	mv /tmp/shellcheck-${SHELLCHECK_VERSION}/shellcheck /usr/local/bin
 
 # Install hadolint

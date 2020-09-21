@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+
 	"go.uber.org/zap"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )

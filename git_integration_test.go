@@ -5,14 +5,15 @@ package main
 import (
 	"bytes"
 	"context"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 var stagingRef = string(plumbing.NewRemoteReferenceName("origin", "staging"))

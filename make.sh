@@ -17,7 +17,7 @@ APP=check-${CIRCLE_PROJECT_REPONAME-app}
 VOLUME=mount-${CIRCLE_PROJECT_REPONAME-default}
 
 function build_builder() {
-  docker build -t "${IMAGE}" .
+  docker build -t "${IMAGE}-builder" -f builder.dockerfile .
 }
 
 function dockerrun() {
@@ -32,7 +32,11 @@ function dockerrun() {
 }
 
 function test() {
-  env "GORACE=halt_on_error=1" go test -v -benchtime 1ns -bench . -race ./...
+  env "GORACE=halt_on_error=1" go test -v -race -benchtime 1ns -bench . ./...
+}
+
+function integration_test() {
+  env "GORACE=halt_on_error=1" go test --tags=integration -v -benchtime 1ns -bench . -race ./...
 }
 
 function build() {

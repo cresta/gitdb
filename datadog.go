@@ -2,14 +2,15 @@ package main
 
 import (
 	"context"
-	"go.uber.org/zap"
-	ddhttp "gopkg.in/DataDog/dd-trace-go.v1/contrib/net/http"
-	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 	"net"
 	"net/http"
 	"os"
 	"sync"
 	"time"
+
+	"go.uber.org/zap"
+	ddhttp "gopkg.in/DataDog/dd-trace-go.v1/contrib/net/http"
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
 
 const ddApmFile = "/var/run/datadog/apm.socket"
