@@ -24,7 +24,7 @@ jobs:
           command: ./make.sh dockerrun test
       - run:
           name: Build docker image
-          command: TAG=$(cat ./out/docker_tag) ./make.sh build_docker
+          command: IMAGE=$(cat ./out/docker_tag) ./make.sh build_docker
       - run:
           name: Save docker image
           command: docker save $(cat ./out/docker_tag) | gzip > ./out/image.tar.gz
