@@ -3,14 +3,15 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/go-git/go-git/v5/plumbing/transport"
-	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/go-git/go-git/v5/plumbing/transport"
+	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 
@@ -26,10 +27,10 @@ type CoreMux interface {
 var _ CoreMux = http.NewServeMux()
 
 type config struct {
-	ListenAddr    string
-	DataDirectory string
-	Repos         string
-	PrivateKey    string
+	ListenAddr       string
+	DataDirectory    string
+	Repos            string
+	PrivateKey       string
 	PrivateKeyPasswd string
 }
 
@@ -46,11 +47,11 @@ func (c config) WithDefaults() config {
 func getConfig() config {
 	return config{
 		// Defaults to ":8080"
-		ListenAddr:    os.Getenv("LISTEN_ADDR"),
-		DataDirectory: os.Getenv("DATA_DIRECTORY"),
-		Repos:         os.Getenv("GITDB_REPOS"),
-		PrivateKey:    os.Getenv("GITDB_PRIVATE_KEY"),
-		PrivateKeyPasswd:    os.Getenv("GITDB_PRIVATE_KEY_PASSWD"),
+		ListenAddr:       os.Getenv("LISTEN_ADDR"),
+		DataDirectory:    os.Getenv("DATA_DIRECTORY"),
+		Repos:            os.Getenv("GITDB_REPOS"),
+		PrivateKey:       os.Getenv("GITDB_PRIVATE_KEY"),
+		PrivateKeyPasswd: os.Getenv("GITDB_PRIVATE_KEY_PASSWD"),
 	}.WithDefaults()
 }
 
@@ -129,7 +130,7 @@ func setupGitServer(cfg config, logger *zap.Logger) (*checkoutHandler, error) {
 		return nil, fmt.Errorf("unable to load private key: %v", err)
 	}
 	g := gitOperator{
-		log: logger,
+		log:  logger,
 		auth: publicKeys,
 	}
 	dataDir := cfg.DataDirectory
