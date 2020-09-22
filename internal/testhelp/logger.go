@@ -1,10 +1,11 @@
 package testhelp
 
 import (
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"strings"
 	"testing"
+
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 func ZapTestingLogger(t *testing.T) *zap.Logger {

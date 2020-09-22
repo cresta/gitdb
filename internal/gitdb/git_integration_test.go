@@ -5,11 +5,12 @@ package gitdb
 import (
 	"bytes"
 	"context"
-	"github.com/cresta/gitdb/internal/testhelp"
 	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/cresta/gitdb/internal/testhelp"
 
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/stretchr/testify/require"
@@ -24,8 +25,6 @@ func cleanupRepo(t *testing.T, c *GitCheckout) {
 	t.Log("Deleting all of", c.AbsPath())
 	require.NoError(t, os.RemoveAll(c.AbsPath()))
 }
-
-
 
 func withRepo(t *testing.T) *GitCheckout {
 	ctx := context.Background()

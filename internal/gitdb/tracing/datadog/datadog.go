@@ -2,12 +2,13 @@ package datadog
 
 import (
 	"context"
-	"github.com/cresta/gitdb/internal/gitdb"
 	"net"
 	"net/http"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/cresta/gitdb/internal/gitdb"
 
 	"go.uber.org/zap"
 	ddhttp "gopkg.in/DataDog/dd-trace-go.v1/contrib/net/http"

@@ -3,14 +3,15 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/cresta/gitdb/internal/gitdb"
-	"github.com/cresta/gitdb/internal/gitdb/tracing/datadog"
 	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/cresta/gitdb/internal/gitdb"
+	"github.com/cresta/gitdb/internal/gitdb/tracing/datadog"
 
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"

@@ -5,7 +5,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/cresta/gitdb/internal/testhelp"
 	"io"
 	"io/ioutil"
 	"net"
@@ -13,6 +12,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+
+	"github.com/cresta/gitdb/internal/testhelp"
 
 	"github.com/stretchr/testify/require"
 )
