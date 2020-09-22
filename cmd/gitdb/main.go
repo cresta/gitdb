@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/cresta/gitdb/internal/gitdb"
+	"github.com/cresta/gitdb/internal/gitdb/tracing/datadog"
 	"io"
 	"io/ioutil"
 	"net"
@@ -17,14 +19,6 @@ import (
 
 	"go.uber.org/zap"
 )
-
-type CoreMux interface {
-	ServeHTTP(w http.ResponseWriter, r *http.Request)
-	Handle(pattern string, handler http.Handler)
-	HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request))
-}
-
-var _ CoreMux = http.NewServeMux()
 
 type config struct {
 	ListenAddr       string
@@ -72,6 +66,14 @@ var instance = Service{
 	config: getConfig(),
 }
 
+func setupLogging() (*zap.Logger, error) {
+	l, err := zap.NewProduction()
+	if err != nil {
+		return nil, err
+	}
+	return l, nil
+}
+
 func (m *Service) Main() {
 	cfg := m.config
 	if m.log == nil {
@@ -84,7 +86,7 @@ func (m *Service) Main() {
 		}
 	}
 	m.log.Info("Starting")
-	rootTracer := setupTracing(m.log.With(zap.String("section", "setup_tracing")))
+	rootTracer := datadog.NewTracer(m.log.With(zap.String("section", "setup_tracing")))
 	co, err := setupGitServer(cfg, m.log)
 	if err != nil {
 		m.log.Panic("uanble to setup git server", zap.Error(err))
@@ -105,7 +107,7 @@ func (m *Service) Main() {
 
 	serveErr := m.server.Serve(ln)
 	if serveErr != http.ErrServerClosed {
-		logIfErr(m.log, serveErr, "server exited")
+		gitdb.LogIfErr(m.log, serveErr, "server exited")
 	}
 	m.log.Info("Server finished")
 	if serveErr != nil {
@@ -123,40 +125,40 @@ func sanitizeDir(s string) string {
 	}, s)
 }
 
-func setupGitServer(cfg config, logger *zap.Logger) (*checkoutHandler, error) {
+func setupGitServer(cfg config, logger *zap.Logger) (*gitdb.CheckoutHandler, error) {
 	logger.Info("setting up git server")
 	publicKeys, err := getPrivateKey(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load private key: %v", err)
 	}
-	g := gitOperator{
-		log:  logger,
-		auth: publicKeys,
+	g := gitdb.GitOperator{
+		Log:  logger,
+		Auth: publicKeys,
 	}
 	dataDir := cfg.DataDirectory
 	if dataDir == "" {
 		dataDir = os.TempDir()
 	}
 	repos := strings.Split(cfg.Repos, ",")
-	gitCheckouts := make(map[string]*gitCheckout)
+	gitCheckouts := make(map[string]*gitdb.GitCheckout)
 	ctx := context.Background()
 	for _, repo := range repos {
 		cloneInto, err := ioutil.TempDir(dataDir, "gitdb_repo_"+sanitizeDir(repo))
 		if err != nil {
 			return nil, fmt.Errorf("unable to make temp dir for %s,%s: %v", dataDir, "gitdb_repo_"+sanitizeDir(repo), err)
 		}
-		co, err := g.clone(ctx, cloneInto, repo)
+		co, err := g.Clone(ctx, cloneInto, repo)
 		if err != nil {
 			return nil, fmt.Errorf("unable to clone repo %s: %v", repo, err)
 		}
 		gitCheckouts[getRepoKey(repo)] = co
 		logger.Info("setup checkout", zap.String("repo", repo), zap.String("key", getRepoKey(repo)))
 	}
-	ret := &checkoutHandler{
-		checkouts: gitCheckouts,
-		log:       logger.With(zap.String("class", "checkout_handler")),
+	ret := &gitdb.CheckoutHandler{
+		Checkouts: gitCheckouts,
+		Log:       logger.With(zap.String("class", "checkout_handler")),
 	}
-	ret.setupMux()
+	ret.SetupMux()
 	return ret, nil
 }
 
@@ -187,7 +189,7 @@ func getRepoKey(repo string) string {
 	return parts2[0]
 }
 
-func setupServer(cfg config, z *zap.Logger, rootTracer *Tracing, coHandler http.Handler) *http.Server {
+func setupServer(cfg config, z *zap.Logger, rootTracer *datadog.Tracing, coHandler http.Handler) *http.Server {
 	mux := rootTracer.CreateRootMux()
 	mux.Handle("/health", HealthHandler(z.With(zap.String("handler", "health"))))
 	mux.Handle("/", coHandler)
@@ -202,7 +204,7 @@ func HealthHandler(z *zap.Logger) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		attachTag(req.Context(), "sampling.priority", 0)
 		_, err := io.WriteString(rw, "OK")
-		logIfErr(z, err, "unable to write back health response")
+		gitdb.LogIfErr(z, err, "unable to write back health response")
 	})
 }
 

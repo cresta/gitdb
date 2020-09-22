@@ -1,7 +1,8 @@
-package main
+package datadog
 
 import (
 	"context"
+	"github.com/cresta/gitdb/internal/gitdb"
 	"net"
 	"net/http"
 	"os"
@@ -16,6 +17,21 @@ import (
 const ddApmFile = "/var/run/datadog/apm.socket"
 const ddStatsFile = "/var/run/datadog/dsd.socket"
 
+func NewTracer(logger *zap.Logger) *Tracing {
+	if !fileExists(ddApmFile) {
+		logger.Info("Unable to find datadog APM file", zap.String("file_name", ddApmFile))
+		return nil
+	}
+	u := &unixRoundTripper{
+		file:        ddApmFile,
+		dialTimeout: 100 * time.Millisecond,
+	}
+
+	tracer.Start(tracer.WithRuntimeMetrics(), tracer.WithHTTPRoundTripper(u), tracer.WithDogstatsdAddress("unix://"+ddStatsFile), tracer.WithLogger(ddZappedLogger{logger}))
+	logger.Info("DataDog tracing enabled")
+	return &Tracing{}
+}
+
 type Tracing struct {
 }
 
@@ -26,7 +42,7 @@ func (t *Tracing) WrapRoundTrip(rt http.RoundTripper) http.RoundTripper {
 	return ddhttp.WrapRoundTripper(rt)
 }
 
-func (t *Tracing) CreateRootMux() CoreMux {
+func (t *Tracing) CreateRootMux() gitdb.CoreMux {
 	if t == nil {
 		return http.NewServeMux()
 	}
@@ -41,19 +57,12 @@ func fileExists(filename string) bool {
 	return !info.IsDir()
 }
 
-func setupTracing(logger *zap.Logger) *Tracing {
-	if !fileExists(ddApmFile) {
-		logger.Info("Unable to find datadog APM file", zap.String("file_name", ddApmFile))
-		return nil
-	}
-	u := &unixRoundTripper{
-		file:        ddApmFile,
-		dialTimeout: 100 * time.Millisecond,
-	}
+type ddZappedLogger struct {
+	*zap.Logger
+}
 
-	tracer.Start(tracer.WithRuntimeMetrics(), tracer.WithHTTPRoundTripper(u), tracer.WithDogstatsdAddress("unix://"+ddStatsFile), tracer.WithLogger(ddZappedLogger{logger}))
-	logger.Info("DataDog tracing enabled")
-	return &Tracing{}
+func (d ddZappedLogger) Log(msg string) {
+	d.Logger.Info(msg)
 }
 
 type unixRoundTripper struct {

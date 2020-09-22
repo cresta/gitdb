@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/cresta/gitdb/internal/testhelp"
 	"io"
 	"io/ioutil"
 	"net"
@@ -23,7 +24,7 @@ func TestServer(t *testing.T) {
 		osExit: func(i int) {
 			atomic.StoreInt64(&atomicOnExit, int64(i))
 		},
-		log: testingZapLogger(t),
+		log: testhelp.ZapTestingLogger(t),
 		config: config{
 			ListenAddr:    ":0",
 			DataDirectory: "",

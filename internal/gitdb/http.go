@@ -1,4 +1,4 @@
-package main
+package gitdb
 
 import (
 	"errors"
@@ -13,17 +13,25 @@ import (
 	"go.uber.org/zap"
 )
 
-type checkoutHandler struct {
-	checkouts map[string]*gitCheckout
-	log       *zap.Logger
+type CheckoutHandler struct {
+	Checkouts map[string]*GitCheckout
+	Log       *zap.Logger
 	mux       *mux.Router
 }
 
-func (h *checkoutHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+type CoreMux interface {
+	ServeHTTP(w http.ResponseWriter, r *http.Request)
+	Handle(pattern string, handler http.Handler)
+	HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request))
+}
+
+var _ CoreMux = http.NewServeMux()
+
+func (h *CheckoutHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	h.mux.ServeHTTP(w, req)
 }
 
-func (h *checkoutHandler) setupMux() {
+func (h *CheckoutHandler) SetupMux() {
 	if h.mux != nil {
 		panic("do not call setup twice")
 	}
@@ -32,13 +40,13 @@ func (h *checkoutHandler) setupMux() {
 	h.mux.Methods(http.MethodPost).Path("/refresh/{repo}").HandlerFunc(h.refreshRepoHandler)
 	h.mux.Methods(http.MethodPost).Path("/refresh").HandlerFunc(h.refreshAllRepoHandler)
 	h.mux.HandleFunc("/", func(rw http.ResponseWriter, req *http.Request) {
-		h.log.Info("not found handler")
-		(&ContextZapLogger{h.log}).With(req.Context()).With(zap.String("handler", "not_found"), zap.String("url", req.URL.String())).Warn("unknown request")
+		h.Log.Info("not found handler")
+		(&ContextZapLogger{h.Log}).With(req.Context()).With(zap.String("handler", "not_found"), zap.String("url", req.URL.String())).Warn("unknown request")
 		http.NotFoundHandler().ServeHTTP(rw, req)
 	})
 }
 
-var _ http.Handler = &checkoutHandler{}
+var _ http.Handler = &CheckoutHandler{}
 
 type getFileResp struct {
 	code int
@@ -60,13 +68,13 @@ func (g *getFileResp) HTTPWrite(w http.ResponseWriter, l *zap.Logger) {
 	}
 }
 
-func (h *checkoutHandler) genericHandler(resp CanHTTPWrite, w http.ResponseWriter, l *zap.Logger) {
+func (h *CheckoutHandler) genericHandler(resp CanHTTPWrite, w http.ResponseWriter, l *zap.Logger) {
 	resp.HTTPWrite(w, l)
 }
 
-func (h *checkoutHandler) refreshAllRepoHandler(w http.ResponseWriter, req *http.Request) {
-	logger := h.log.With(zap.String("handler", "all_repo"))
-	for repoName, repo := range h.checkouts {
+func (h *CheckoutHandler) refreshAllRepoHandler(w http.ResponseWriter, req *http.Request) {
+	logger := h.Log.With(zap.String("handler", "all_repo"))
+	for repoName, repo := range h.Checkouts {
 		if err := repo.Refresh(req.Context()); err != nil {
 			h.genericHandler(&getFileResp{
 				code: http.StatusInternalServerError,
@@ -81,11 +89,11 @@ func (h *checkoutHandler) refreshAllRepoHandler(w http.ResponseWriter, req *http
 	}, w, logger)
 }
 
-func (h *checkoutHandler) refreshRepoHandler(w http.ResponseWriter, req *http.Request) {
+func (h *CheckoutHandler) refreshRepoHandler(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 	repo := vars["repo"]
-	logger := h.log.With(zap.String("repo", repo))
-	r, exists := h.checkouts[repo]
+	logger := h.Log.With(zap.String("repo", repo))
+	r, exists := h.Checkouts[repo]
 	if !exists {
 		h.genericHandler(&getFileResp{
 			code: http.StatusNotFound,
@@ -107,12 +115,12 @@ func (h *checkoutHandler) refreshRepoHandler(w http.ResponseWriter, req *http.Re
 	}, w, logger)
 }
 
-func (h *checkoutHandler) getFileHandler(w http.ResponseWriter, req *http.Request) {
+func (h *CheckoutHandler) getFileHandler(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 	repo := vars["repo"]
 	branch := vars["branch"]
 	path := vars["path"]
-	logger := h.log.With(zap.String("repo", repo), zap.String("branch", branch), zap.String("path", path))
+	logger := h.Log.With(zap.String("repo", repo), zap.String("branch", branch), zap.String("path", path))
 	logger.Info("get file handler")
 	if repo == "" || branch == "" || path == "" {
 		w.WriteHeader(http.StatusNotFound)
@@ -124,8 +132,8 @@ func (h *checkoutHandler) getFileHandler(w http.ResponseWriter, req *http.Reques
 	h.genericHandler(h.getFile(repo, branch, path, logger), w, logger)
 }
 
-func (h *checkoutHandler) getFile(repo string, branch string, path string, logger *zap.Logger) *getFileResp {
-	r, exists := h.checkouts[repo]
+func (h *CheckoutHandler) getFile(repo string, branch string, path string, logger *zap.Logger) *getFileResp {
+	r, exists := h.Checkouts[repo]
 	if !exists {
 		buf := strings.NewReader(fmt.Sprintf("unable to find repo %s", repo))
 		logger.Info("invalid repo")

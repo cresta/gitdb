@@ -1,4 +1,4 @@
-package main
+package gitdb
 
 import (
 	"context"
@@ -14,29 +14,29 @@ import (
 	"go.uber.org/zap"
 )
 
-type gitOperator struct {
-	log  *zap.Logger
-	auth transport.AuthMethod
+type GitOperator struct {
+	Log  *zap.Logger
+	Auth transport.AuthMethod
 }
 
-func (g *gitOperator) clone(ctx context.Context, into string, remoteURL string) (*gitCheckout, error) {
+func (g *GitOperator) Clone(ctx context.Context, into string, remoteURL string) (*GitCheckout, error) {
 	repo, err := git.PlainCloneContext(ctx, into, true, &git.CloneOptions{
 		URL:   remoteURL,
 		Depth: 1,
-		Auth:  g.auth,
+		Auth:  g.Auth,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &gitCheckout{
+	return &GitCheckout{
 		repo:      repo,
 		absPath:   into,
 		remoteURL: remoteURL,
-		log:       g.log.With(zap.String("repo", remoteURL)),
+		log:       g.Log.With(zap.String("repo", remoteURL)),
 	}, nil
 }
 
-type gitCheckout struct {
+type GitCheckout struct {
 	absPath   string
 	repo      *git.Repository
 	log       *zap.Logger
@@ -44,7 +44,7 @@ type gitCheckout struct {
 	remoteURL string
 }
 
-func (g *gitCheckout) Refresh(ctx context.Context) error {
+func (g *GitCheckout) Refresh(ctx context.Context) error {
 	err := g.repo.FetchContext(ctx, &git.FetchOptions{})
 	if err == nil || errors.Is(err, git.NoErrAlreadyUpToDate) {
 		return nil
@@ -52,18 +52,18 @@ func (g *gitCheckout) Refresh(ctx context.Context) error {
 	return fmt.Errorf("unable to refresh repository: %v", err)
 }
 
-func (g *gitCheckout) AbsPath() string {
+func (g *GitCheckout) AbsPath() string {
 	return g.absPath
 }
 
-func (g *gitCheckout) reference() (*plumbing.Reference, error) {
+func (g *GitCheckout) reference() (*plumbing.Reference, error) {
 	if g.ref != nil {
 		return g.ref, nil
 	}
 	return g.repo.Head()
 }
 
-func (g *gitCheckout) RemoteExists(remote string) bool {
+func (g *GitCheckout) RemoteExists(remote string) bool {
 	r, err := g.repo.Remote(remote)
 	if err != nil {
 		return false
@@ -71,13 +71,13 @@ func (g *gitCheckout) RemoteExists(remote string) bool {
 	return r != nil
 }
 
-func (g *gitCheckout) WithReference(refName string) (*gitCheckout, error) {
+func (g *GitCheckout) WithReference(refName string) (*GitCheckout, error) {
 	r, err := g.repo.Reference(plumbing.ReferenceName(refName), true)
 	if err != nil {
 		return nil, fmt.Errorf("unable to resolve ref %s: %v", refName, err)
 	}
 	g.log.Info("Switched hash", zap.String("hash", r.Hash().String()))
-	return &gitCheckout{
+	return &GitCheckout{
 		absPath:   g.absPath,
 		remoteURL: g.remoteURL,
 		repo:      g.repo,
@@ -86,7 +86,7 @@ func (g *gitCheckout) WithReference(refName string) (*gitCheckout, error) {
 	}, nil
 }
 
-func (g *gitCheckout) LsFiles() ([]string, error) {
+func (g *GitCheckout) LsFiles() ([]string, error) {
 	g.log.Info("asked to list files")
 	defer g.log.Info("list done")
 	w, err := g.reference()
@@ -111,7 +111,7 @@ func (g *gitCheckout) LsFiles() ([]string, error) {
 	return ret, nil
 }
 
-func (g *gitCheckout) FileContent(fileName string) (io.WriterTo, error) {
+func (g *GitCheckout) FileContent(fileName string) (io.WriterTo, error) {
 	g.log.Info("asked to fetch file", zap.String("file_name", fileName))
 	defer g.log.Info("fetch done")
 	w, err := g.reference()
