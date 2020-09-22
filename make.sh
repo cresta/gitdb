@@ -51,7 +51,7 @@ function integration_test() {
 function build() {
   go mod download
   go mod verify
-  GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o /go/bin/gitdb -ldflags '-extldflags "-f no-PIC -static"' -tags 'osusergo netgo static_build'
+  GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o gitdb -ldflags '-extldflags "-f no-PIC -static"' -tags 'osusergo netgo static_build' ./cmd/gitdb
 }
 
 function reformat() {

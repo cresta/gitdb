@@ -13,12 +13,11 @@ COPY --from=builder /etc/group /etc/group
 COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 
 # Copy our static executable
-COPY --from=builder /go/bin/gitdb /go/bin/gitdb
+COPY --from=builder /work/gitdb /gitdb
 COPY --chown=appuser --from=builder /empty_dir /tmp
 # Use an unprivileged user.
 #USER appuser:appuser
 
 
 EXPOSE 8080
-# Run the hello binary.
-ENTRYPOINT ["/go/bin/gitdb"]
+ENTRYPOINT ["/gitdb"]
