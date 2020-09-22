@@ -1,0 +1,27 @@
+name: Go
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Make Docker tag
+        run: |
+          mkdir ./out && echo ${DOCKER_HUB_URL-quay.io}/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}:${CIRCLE_BRANCH}-$(date -u +"%Y%m%dT%H%M%SZ")-$(echo $CIRCLE_SHA1 | cut -c -7) > ./out/docker_tag && cat ./out/docker_tag
+      - name: Make builder
+        run: ./make.sh build_builder
+      - name: Lint
+        run: ./make.sh dockerrun lint
+      - name: Test
+        run: ./make.sh dockerrun test
+      - name: Build docker
+        run: IMAGE=$(cat ./out/docker_tag) ./make.sh build_docker
