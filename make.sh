@@ -63,6 +63,7 @@ function lint() {
   golangci-lint run
   shellcheck ./make.sh
   hadolint ./Dockerfile
+  hadolint ./builder.dockerfile
 }
 
 declare -a funcs=(reformat check_formatting export_docker import_docker build_docker dockerrun lint build_builder build test)

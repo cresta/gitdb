@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/go-git/go-git/v5/plumbing/transport"
+	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	"io"
 	"io/ioutil"
 	"net"
@@ -27,6 +29,8 @@ type config struct {
 	ListenAddr    string
 	DataDirectory string
 	Repos         string
+	PrivateKey    string
+	PrivateKeyPasswd string
 }
 
 func (c config) WithDefaults() config {
@@ -45,6 +49,8 @@ func getConfig() config {
 		ListenAddr:    os.Getenv("LISTEN_ADDR"),
 		DataDirectory: os.Getenv("DATA_DIRECTORY"),
 		Repos:         os.Getenv("GITDB_REPOS"),
+		PrivateKey:    os.Getenv("GITDB_PRIVATE_KEY"),
+		PrivateKeyPasswd:    os.Getenv("GITDB_PRIVATE_KEY_PASSWD"),
 	}.WithDefaults()
 }
 
@@ -118,8 +124,13 @@ func sanitizeDir(s string) string {
 
 func setupGitServer(cfg config, logger *zap.Logger) (*checkoutHandler, error) {
 	logger.Info("setting up git server")
+	publicKeys, err := getPrivateKey(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("unable to load private key: %v", err)
+	}
 	g := gitOperator{
 		log: logger,
+		auth: publicKeys,
 	}
 	dataDir := cfg.DataDirectory
 	if dataDir == "" {
@@ -146,6 +157,21 @@ func setupGitServer(cfg config, logger *zap.Logger) (*checkoutHandler, error) {
 	}
 	ret.setupMux()
 	return ret, nil
+}
+
+func getPrivateKey(cfg config) (transport.AuthMethod, error) {
+	if cfg.PrivateKey == "" {
+		return nil, nil
+	}
+	sshKey, err := ioutil.ReadFile(cfg.PrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read file %s: %v", cfg.PrivateKey, err)
+	}
+	publicKey, err := ssh.NewPublicKeys("git", sshKey, cfg.PrivateKeyPasswd)
+	if err != nil {
+		return nil, fmt.Errorf("unable to load public keys: %v", err)
+	}
+	return publicKey, nil
 }
 
 func getRepoKey(repo string) string {

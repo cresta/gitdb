@@ -16,7 +16,7 @@ COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=builder /go/bin/gitdb /go/bin/gitdb
 COPY --chown=appuser --from=builder /empty_dir /tmp
 # Use an unprivileged user.
-USER appuser:appuser
+#USER appuser:appuser
 
 
 EXPOSE 8080

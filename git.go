@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/go-git/go-git/v5/plumbing/transport"
 	"io"
 
 	"github.com/go-git/go-git/v5"
@@ -13,13 +14,15 @@ import (
 )
 
 type gitOperator struct {
-	log *zap.Logger
+	log        *zap.Logger
+	auth       transport.AuthMethod
 }
 
 func (g *gitOperator) clone(ctx context.Context, into string, remoteURL string) (*gitCheckout, error) {
 	repo, err := git.PlainCloneContext(ctx, into, true, &git.CloneOptions{
 		URL:   remoteURL,
 		Depth: 1,
+		Auth:  g.auth,
 	})
 	if err != nil {
 		return nil, err
