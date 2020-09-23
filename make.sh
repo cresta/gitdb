@@ -6,16 +6,16 @@ if [ "${DEBUG-}" == "true" ]; then
 fi
 
 # Repo is part of the image name for this build (repo=repository)
-REPO=${CIRCLE_PROJECT_USERNAME-cresta}/${CIRCLE_PROJECT_REPONAME-gitdb}
+REPO=${GITHUB_REPOSITORY}
 # Tag is the image tag of this build's docker file
-TAG=${TAG-${CIRCLE_SHA1-latest}}
+TAG=${TAG-${GITHUB_SHA-latest}}
 # The docker image is the repository and tag together
 IMAGE=${IMAGE-"${REPO}:${TAG}"}
 BUILDER_IMAGE=builder-gitdb:${TAG}-builder
-VOLUME=mount-${CIRCLE_PROJECT_REPONAME-default}
+VOLUME=mount-${GITHUB_WORKFLOW-default}
 
 # App is the name of the docker container we execute in dockerrun
-APP=check-${CIRCLE_PROJECT_REPONAME-app}
+APP=check-${GITHUB_WORKFLOW-app}
 
 function build_builder() {
   docker build -t "${BUILDER_IMAGE}" -f builder.dockerfile .
