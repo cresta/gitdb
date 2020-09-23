@@ -14,8 +14,8 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v2
       - name: Make Docker tag
-        run: |
-          mkdir ./out && echo ${DOCKER_HUB_URL-quay.io}/${GITHUB_REPOSITORY}:${CIRCLE_BRANCH}-$(date -u +"%Y%m%dT%H%M%SZ")-$(echo $GITHUB_SHA | cut -c -7) > ./out/docker_tag && cat ./out/docker_tag
+        # https://stackoverflow.com/questions/58033366/how-to-get-current-branch-within-github-actions
+        run: mkdir ./out && echo ${DOCKER_HUB_URL-quay.io}/${GITHUB_REPOSITORY}:${GITHUB_REF#refs/heads/}-$(date -u +"%Y%m%dT%H%M%SZ")-$(echo $GITHUB_SHA | cut -c -7) > ./out/docker_tag && cat ./out/docker_tag
       - name: Make builder
         run: ./make.sh build_builder
       - name: Lint
