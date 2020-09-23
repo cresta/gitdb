@@ -12,10 +12,10 @@ TAG=${TAG-${GITHUB_SHA-latest}}
 # The docker image is the repository and tag together
 IMAGE=${IMAGE-"${REPO}:${TAG}"}
 BUILDER_IMAGE=builder-gitdb:${TAG}-builder
-VOLUME=mount-${GITHUB_WORKFLOW-default}
 
 # App is the name of the docker container we execute in dockerrun
 APP=check-${GITHUB_WORKFLOW-app}
+VOLUME=mount-${APP}
 
 function build_builder() {
   docker build -t "${BUILDER_IMAGE}" -f builder.dockerfile .
