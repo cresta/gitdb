@@ -6,7 +6,7 @@ if [ "${DEBUG-}" == "true" ]; then
 fi
 
 # Repo is part of the image name for this build (repo=repository)
-REPO=${GITHUB_REPOSITORY}
+REPO=${GITHUB_REPOSITORY-unset}
 # Tag is the image tag of this build's docker file
 TAG=${TAG-${GITHUB_SHA-latest}}
 # The docker image is the repository and tag together
