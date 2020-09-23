@@ -14,7 +14,7 @@ IMAGE=${IMAGE-"${REPO}:${TAG}"}
 BUILDER_IMAGE=builder-gitdb:${TAG}-builder
 
 # App is the name of the docker container we execute in dockerrun
-APP=check-${GITHUB_WORKFLOW-app}
+APP=gitdb-app
 VOLUME=mount-${APP}
 
 function build_builder() {
