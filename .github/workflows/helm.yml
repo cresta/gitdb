@@ -27,13 +27,10 @@ jobs:
           command: lint
       - name: Create kind cluster
         uses: helm/kind-action@v1.0.0
-        if: steps.lint.outputs.changed == 'true'
-
       - name: Run chart-testing (install)
         uses: helm/chart-testing-action@v1.0.0
         with:
           command: install
-
       - name: Run chart-releaser
         uses: helm/chart-releaser-action@v1.0.0
         env:
