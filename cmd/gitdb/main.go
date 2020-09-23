@@ -144,6 +144,10 @@ func setupGitServer(cfg config, logger *zap.Logger) (*gitdb.CheckoutHandler, err
 	gitCheckouts := make(map[string]*gitdb.GitCheckout)
 	ctx := context.Background()
 	for _, repo := range repos {
+		repo := strings.TrimSpace(repo)
+		if repo == "" {
+			continue
+		}
 		cloneInto, err := ioutil.TempDir(dataDir, "gitdb_repo_"+sanitizeDir(repo))
 		if err != nil {
 			return nil, fmt.Errorf("unable to make temp dir for %s,%s: %v", dataDir, "gitdb_repo_"+sanitizeDir(repo), err)
