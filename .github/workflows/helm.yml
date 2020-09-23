@@ -34,7 +34,7 @@ jobs:
       - name: Test helm chart
         run:  helm test gitdb
       - name: Remove helm chart
-        run:  helm remove gitdb
+        run:  helm uninstall gitdb
       - name: Run chart-releaser
         uses: helm/chart-releaser-action@v1.0.0
         env:
