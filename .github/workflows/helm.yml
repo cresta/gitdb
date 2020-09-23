@@ -28,7 +28,7 @@ jobs:
       - name: Create kind cluster
         uses: helm/kind-action@v1.0.0
       - name: Install helm chart
-        run:  docker run -v $(pwd):/apps:ro -v ~/.kube:/root/.kube:ro -v ~/.helm:/root/.helm:ro alpine/helm:3.3.4 install gitdb ./charts/gitdb
+        run:  docker run --net=host -v $(pwd):/apps:ro -v ~/.kube:/root/.kube:ro -v ~/.helm:/root/.helm:ro alpine/helm:3.3.4 install gitdb ./charts/gitdb
       - name: Test helm chart
         run:  helm test gitdb
       - name: Remove helm chart
