@@ -12,7 +12,6 @@ jobs:
       - name: Make Docker tag
         # https://stackoverflow.com/questions/58033366/how-to-get-current-branch-within-github-actions
         run: mkdir ./out && echo ghcr.io/${GITHUB_REPOSITORY}:${GITHUB_REF#refs/heads/}-$(date -u +"%Y%m%dT%H%M%SZ")-$(echo $GITHUB_SHA | cut -c -7) > ./out/docker_tag && cat ./out/docker_tag
-        if: github.event.push
       - name: Make builder
         run: ./make.sh build_builder
       - name: Lint
@@ -22,12 +21,12 @@ jobs:
       - name: Build docker
         run: IMAGE=$(cat ./out/docker_tag) ./make.sh build_docker
       - name: Login to GitHub Container Registry
-        if: github.event.push
+        if: github.event_name = push
         uses: docker/login-action@v1
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GHCR_PAT }}
       - name: Push docker image
-        if: github.event.push
+        if: github.event_name = push
         run: docker push $(cat ./out/docker_tag)
