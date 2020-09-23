@@ -29,4 +29,4 @@ jobs:
           password: ${{ secrets.GHCR_PAT }}
       - name: Push docker image
         if: github.event_name == 'push'
-        run: docker push $(cat ./out/docker_tag)
+        run: docker push $(cat ./out/docker_tag) && docker tag $(cat ./out/docker_tag) echo ghcr.io/${GITHUB_REPOSITORY}:${GITHUB_REF##*/} && docker push echo ghcr.io/${GITHUB_REPOSITORY}:${GITHUB_REF##*/}
