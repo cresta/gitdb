@@ -29,6 +29,6 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
-          password: ${{ secrets.TESTING }}
+          password: ${{ secrets.GHCR_PAT }}
       - name: Push docker image
         run: docker push $(cat ./out/docker_tag)
