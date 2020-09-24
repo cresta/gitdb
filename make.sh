@@ -59,6 +59,22 @@ function reformat() {
 	find . -iname '*.go' -print0 | xargs -0 goimports -w
 }
 
+function docker_tags() {
+  if [[ ${GITHUB_REF} =~ refs/tags/ ]]; then
+    tag=${GITHUB_REF/refs\/tags\//}
+    if [[ ${tag} == v* ]]; then
+      tag=${tag:1}
+    fi
+    echo "ghcr.io/${GITHUB_REPOSITORY}:${tag}"
+  fi
+  if [[ ${GITHUB_REF} =~ refs/heads/ ]]; then
+    tag=${GITHUB_REF/refs\/heads\//}
+    tag=${tag//\//-}
+    echo "ghcr.io/${GITHUB_REPOSITORY}:${tag}-$(date -u +"%Y%m%dT%H%M%SZ")-$(echo "${GITHUB_SHA}" | cut -c -7)"
+    echo "ghcr.io/${GITHUB_REPOSITORY}:${tag}"
+  fi
+}
+
 function lint() {
   golangci-lint run
   shellcheck ./make.sh
@@ -66,7 +82,17 @@ function lint() {
   hadolint ./builder.dockerfile
 }
 
-declare -a funcs=(reformat check_formatting export_docker import_docker build_docker dockerrun lint build_builder build test)
+function push_images() {
+  docker push "${IMAGE}"
+  IFS=$'\n'       # make newlines the only separator
+  for TAG in $(docker_tags); do
+    echo "Making tag ${TAG}"
+    docker tag "${IMAGE}" "${TAG}"
+    docker push "${TAG}"
+  done
+}
+
+declare -a funcs=(reformat check_formatting export_docker import_docker build_docker dockerrun lint build_builder build test docker_tags push_images)
 for f in "${funcs[@]}"; do
   if [ "${f}" == "${1-}" ]; then
     $f "${@:2}"
