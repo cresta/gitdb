@@ -71,8 +71,11 @@ function docker_tags() {
   if [[ ${GITHUB_REF} =~ refs/heads/ ]]; then
     tag=${GITHUB_REF/refs\/heads\//}
     tag=${tag//\//-}
-    echo "${CONTAINER_REGISTRY}/${GITHUB_REPOSITORY}:${tag}-$(date -u +"%Y%m%dT%H%M%SZ")-$(echo "${GITHUB_SHA}" | cut -c -7)"
-    echo "${CONTAINER_REGISTRY}/${GITHUB_REPOSITORY}:${tag}"
+    echo "${CONTAINER_REGISTRY}/${GITHUB_REPOSITORY}:b-${tag}-$(date -u +"%Y%m%dT%H%M%SZ")-$(echo "${GITHUB_SHA}" | cut -c -7)"
+    echo "${CONTAINER_REGISTRY}/${GITHUB_REPOSITORY}:b-${tag}"
+  fi
+  if [[ ${GITHUB_REF} == refs/heads/master ]]; then
+    echo "${CONTAINER_REGISTRY}/${GITHUB_REPOSITORY}:latest"
   fi
 }
 
