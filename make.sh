@@ -61,6 +61,7 @@ function reformat() {
 }
 
 function docker_tags() {
+  echo "${CONTAINER_REGISTRY}/${GITHUB_REPOSITORY}:${GITHUB_SHA}"
   if [[ ${GITHUB_REF} =~ refs/tags/ ]]; then
     tag=${GITHUB_REF/refs\/tags\//}
     if [[ ${tag} == v* ]]; then
@@ -68,14 +69,11 @@ function docker_tags() {
     fi
     echo "${CONTAINER_REGISTRY}/${GITHUB_REPOSITORY}:${tag}"
   fi
-  if [[ ${GITHUB_REF} =~ refs/heads/ ]]; then
-    tag=${GITHUB_REF/refs\/heads\//}
-    tag=${tag//\//-}
-    echo "${CONTAINER_REGISTRY}/${GITHUB_REPOSITORY}:b-${tag}-$(date -u +"%Y%m%dT%H%M%SZ")-$(echo "${GITHUB_SHA}" | cut -c -7)"
-    echo "${CONTAINER_REGISTRY}/${GITHUB_REPOSITORY}:b-${tag}"
-  fi
   if [[ ${GITHUB_REF} == refs/heads/master ]]; then
     echo "${CONTAINER_REGISTRY}/${GITHUB_REPOSITORY}:latest"
+    tag=${GITHUB_REF/refs\/heads\//}
+    tag=${tag//\//-}
+    echo "${CONTAINER_REGISTRY}/${GITHUB_REPOSITORY}:master-$(date -u +"%Y%m%dT%H%M%SZ")-$(echo "${GITHUB_SHA}" | cut -c -7)"
   fi
 }
 
