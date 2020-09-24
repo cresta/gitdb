@@ -5,12 +5,13 @@ if [ "${DEBUG-}" == "true" ]; then
   set -x
 fi
 
+CONTAINER_REGISTRY="ghcr.io"
 # Repo is part of the image name for this build (repo=repository)
 REPO=${GITHUB_REPOSITORY-unset}
 # Tag is the image tag of this build's docker file
 TAG=${TAG-${GITHUB_SHA-latest}}
 # The docker image is the repository and tag together
-IMAGE=${IMAGE-"${REPO}:${TAG}"}
+IMAGE=${IMAGE-"${CONTAINER_REGISTRY}/${REPO}:${TAG}"}
 BUILDER_IMAGE=builder-gitdb:${TAG}-builder
 
 # App is the name of the docker container we execute in dockerrun
@@ -65,13 +66,13 @@ function docker_tags() {
     if [[ ${tag} == v* ]]; then
       tag=${tag:1}
     fi
-    echo "ghcr.io/${GITHUB_REPOSITORY}:${tag}"
+    echo "${CONTAINER_REGISTRY}/${GITHUB_REPOSITORY}:${tag}"
   fi
   if [[ ${GITHUB_REF} =~ refs/heads/ ]]; then
     tag=${GITHUB_REF/refs\/heads\//}
     tag=${tag//\//-}
-    echo "ghcr.io/${GITHUB_REPOSITORY}:${tag}-$(date -u +"%Y%m%dT%H%M%SZ")-$(echo "${GITHUB_SHA}" | cut -c -7)"
-    echo "ghcr.io/${GITHUB_REPOSITORY}:${tag}"
+    echo "${CONTAINER_REGISTRY}/${GITHUB_REPOSITORY}:${tag}-$(date -u +"%Y%m%dT%H%M%SZ")-$(echo "${GITHUB_SHA}" | cut -c -7)"
+    echo "${CONTAINER_REGISTRY}/${GITHUB_REPOSITORY}:${tag}"
   fi
 }
 
