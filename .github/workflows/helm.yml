@@ -30,6 +30,7 @@ jobs:
       - name: Install helm chart
         run:  helm install gitdb ./charts/gitdb
       - name: Wait for deployment to finish
+        timeout-minutes: 1
         run:  kubectl rollout status --watch deployment/gitdb
       - name: Test helm chart
         run:  helm test gitdb
