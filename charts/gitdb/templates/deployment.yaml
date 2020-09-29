@@ -34,10 +34,16 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
+          {{- if .Values.git }}
+          {{- if .Values.git.privateKey }}
             - name: GITDB_PRIVATE_KEY
-              value: /etc/gitdb/gitdb-reference
+              value: {{ .Values.git.privateKey | quote }}
+          {{- end }}
+          {{- if .Values.git.repos }}
             - name: GITDB_REPOS
-              value: git@github.com:cresta/gitdb-reference.git
+              value: {{ .Values.git.repos | quote }}
+          {{- end }}
+          {{- end }}
             - name: SSH_KNOWN_HOSTS
               value: /etc/ssh/ssh_known_hosts
           ports:
@@ -54,10 +60,12 @@ spec:
               port: http
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+      {{- if (and .Values.git .Values.git.secretName) }}
           volumeMounts: 
             - mountPath: /etc/gitdb
               name: git-key
               readOnly: true
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -75,9 +83,5 @@ spec:
       - name: git-key
         secret:
           defaultMode: 256
-          {{- if .Values.git.secretName }}
           secretName: {{ .Values.git.secretName }}
-          {{- else }}
-          secretName: {{ template "gitdb.fullname" . }}-ssh-key
-          {{- end }}
       {{- end }}

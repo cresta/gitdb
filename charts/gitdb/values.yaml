@@ -26,6 +26,8 @@ serviceAccount:
 podAnnotations: {}
 
 git: {}
+#  privateKey: ""
+#  repos: ""
 
 podSecurityContext:
   fsGroup: 10001
