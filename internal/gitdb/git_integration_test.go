@@ -40,7 +40,7 @@ func withRepo(t *testing.T) *GitCheckout {
 	g := GitOperator{
 		Log: testhelp.ZapTestingLogger(t),
 	}
-	c, err := g.Clone(ctx, into, repo)
+	c, err := g.Clone(ctx, into, repo, nil)
 	require.NoError(t, err)
 	require.NotNil(t, c)
 	return c

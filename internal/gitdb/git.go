@@ -15,15 +15,14 @@ import (
 )
 
 type GitOperator struct {
-	Log  *zap.Logger
-	Auth transport.AuthMethod
+	Log *zap.Logger
 }
 
-func (g *GitOperator) Clone(ctx context.Context, into string, remoteURL string) (*GitCheckout, error) {
+func (g *GitOperator) Clone(ctx context.Context, into string, remoteURL string, auth transport.AuthMethod) (*GitCheckout, error) {
 	repo, err := git.PlainCloneContext(ctx, into, true, &git.CloneOptions{
 		URL:   remoteURL,
 		Depth: 1,
-		Auth:  g.Auth,
+		Auth:  auth,
 	})
 	if err != nil {
 		return nil, err

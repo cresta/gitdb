@@ -126,15 +126,27 @@ func sanitizeDir(s string) string {
 	}, s)
 }
 
+func getPublicKey(k []transport.AuthMethod, idx int) transport.AuthMethod {
+	if len(k) == 0 {
+		return nil
+	}
+	if len(k) == 1 {
+		return k[0]
+	}
+	if idx >= len(k) {
+		return nil
+	}
+	return k[idx]
+}
+
 func setupGitServer(cfg config, logger *zap.Logger) (*gitdb.CheckoutHandler, error) {
 	logger.Info("setting up git server")
-	publicKeys, err := getPrivateKey(cfg)
+	publicKeys, err := getPrivateKeys(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load private key: %v", err)
 	}
 	g := gitdb.GitOperator{
-		Log:  logger,
-		Auth: publicKeys,
+		Log: logger,
 	}
 	dataDir := cfg.DataDirectory
 	if dataDir == "" {
@@ -143,7 +155,7 @@ func setupGitServer(cfg config, logger *zap.Logger) (*gitdb.CheckoutHandler, err
 	repos := strings.Split(cfg.Repos, ",")
 	gitCheckouts := make(map[string]*gitdb.GitCheckout)
 	ctx := context.Background()
-	for _, repo := range repos {
+	for idx, repo := range repos {
 		repo := strings.TrimSpace(repo)
 		if repo == "" {
 			continue
@@ -152,7 +164,7 @@ func setupGitServer(cfg config, logger *zap.Logger) (*gitdb.CheckoutHandler, err
 		if err != nil {
 			return nil, fmt.Errorf("unable to make temp dir for %s,%s: %v", dataDir, "gitdb_repo_"+sanitizeDir(repo), err)
 		}
-		co, err := g.Clone(ctx, cloneInto, repo)
+		co, err := g.Clone(ctx, cloneInto, repo, getPublicKey(publicKeys, idx))
 		if err != nil {
 			return nil, fmt.Errorf("unable to clone repo %s: %v", repo, err)
 		}
@@ -167,19 +179,28 @@ func setupGitServer(cfg config, logger *zap.Logger) (*gitdb.CheckoutHandler, err
 	return ret, nil
 }
 
-func getPrivateKey(cfg config) (transport.AuthMethod, error) {
-	if cfg.PrivateKey == "" {
+func getPrivateKeys(cfg config) ([]transport.AuthMethod, error) {
+	pKey := strings.TrimSpace(cfg.PrivateKey)
+	if pKey == "" {
 		return nil, nil
 	}
-	sshKey, err := ioutil.ReadFile(cfg.PrivateKey)
-	if err != nil {
-		return nil, fmt.Errorf("unable to read file %s: %v", cfg.PrivateKey, err)
+	files := strings.Split(pKey, ",")
+	ret := make([]transport.AuthMethod, 0, len(files))
+	for _, file := range files {
+		if file == "" {
+			ret = append(ret, nil)
+		}
+		sshKey, err := ioutil.ReadFile(file)
+		if err != nil {
+			return nil, fmt.Errorf("unable to read file %s: %v", file, err)
+		}
+		publicKey, err := ssh.NewPublicKeys("git", sshKey, cfg.PrivateKeyPasswd)
+		if err != nil {
+			return nil, fmt.Errorf("unable to load public keys: %v", err)
+		}
+		ret = append(ret, publicKey)
 	}
-	publicKey, err := ssh.NewPublicKeys("git", sshKey, cfg.PrivateKeyPasswd)
-	if err != nil {
-		return nil, fmt.Errorf("unable to load public keys: %v", err)
-	}
-	return publicKey, nil
+	return ret, nil
 }
 
 func getRepoKey(repo string) string {
