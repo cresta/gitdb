@@ -9,9 +9,6 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v2
-      - name: Make Docker tag
-        # https://stackoverflow.com/questions/58033366/how-to-get-current-branch-within-github-actions
-        run: mkdir ./out && echo ghcr.io/${GITHUB_REPOSITORY}:${GITHUB_REF##*/}-$(date -u +"%Y%m%dT%H%M%SZ")-$(echo $GITHUB_SHA | cut -c -7) > ./out/docker_tag && cat ./out/docker_tag
       - name: Make builder
         run: ./make.sh build_builder
       - name: Lint
@@ -19,7 +16,7 @@ jobs:
       - name: Test
         run: ./make.sh dockerrun test
       - name: Build docker
-        run: IMAGE=$(cat ./out/docker_tag) ./make.sh build_docker
+        run: ./make.sh build_docker
       - name: Login to GitHub Container Registry
         if: github.event_name == 'push'
         uses: docker/login-action@v1
@@ -29,4 +26,4 @@ jobs:
           password: ${{ secrets.GHCR_PAT }}
       - name: Push docker image
         if: github.event_name == 'push'
-        run: docker push $(cat ./out/docker_tag) && docker tag $(cat ./out/docker_tag) ghcr.io/${GITHUB_REPOSITORY}:${GITHUB_REF##*/} && docker push ghcr.io/${GITHUB_REPOSITORY}:${GITHUB_REF##*/}
+        run: ./make.sh push_images
