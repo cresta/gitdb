@@ -67,7 +67,7 @@ func TestServer(t *testing.T) {
 		require.Equal(t, http.StatusNotFound, resp.StatusCode)
 	})
 	t.Run("github_event_invalid_body", func(t *testing.T) {
-		resp, err := http.Get(fmt.Sprintf("http://localhost:%d/public/github/push_event", sendPort))
+		resp, err := http.Post(fmt.Sprintf("http://localhost:%d/public/github/push_event", sendPort), "", nil)
 		require.NoError(t, err)
 		require.Equal(t, http.StatusForbidden, resp.StatusCode)
 	})
