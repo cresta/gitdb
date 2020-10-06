@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/google/go-github/v32/github"
-	"github.com/gorilla/mux"
-	"go.uber.org/zap"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/google/go-github/v32/github"
+	"github.com/gorilla/mux"
+	"go.uber.org/zap"
 )
 
 type GitCheckout interface {

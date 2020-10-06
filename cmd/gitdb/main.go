@@ -3,13 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/cresta/gitdb/internal/gitdb/repoprovider/github"
 	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/cresta/gitdb/internal/gitdb/repoprovider/github"
 
 	"github.com/cresta/gitdb/internal/gitdb"
 	"github.com/cresta/gitdb/internal/gitdb/tracing/datadog"
