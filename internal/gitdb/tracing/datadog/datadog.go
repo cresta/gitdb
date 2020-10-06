@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cresta/gitdb/internal/gitdb"
+	"github.com/gorilla/mux"
 
 	"go.uber.org/zap"
 	ddhttp "gopkg.in/DataDog/dd-trace-go.v1/contrib/net/http"
@@ -43,11 +43,20 @@ func (t *Tracing) WrapRoundTrip(rt http.RoundTripper) http.RoundTripper {
 	return ddhttp.WrapRoundTripper(rt)
 }
 
-func (t *Tracing) CreateRootMux() gitdb.CoreMux {
+func (t *Tracing) CreateRootMux() *mux.Router {
 	if t == nil {
-		return http.NewServeMux()
+		return mux.NewRouter()
 	}
-	return ddhttp.NewServeMux(ddhttp.WithServiceName("gitdb"))
+	wrapped := ddhttp.NewServeMux(ddhttp.WithServiceName("gitdb"))
+
+	retMux := mux.NewRouter()
+	retMux.Use(func(handler http.Handler) http.Handler {
+		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			a, _ := wrapped.Handler(request)
+			a.ServeHTTP(writer, request)
+		})
+	})
+	return retMux
 }
 
 func fileExists(filename string) bool {

@@ -154,7 +154,6 @@ func setupGithubListener(cfg config, logger *zap.Logger, handler *gitdb.Checkout
 		Logger:    logger.With(zap.String("class", "github.Provider")),
 		Checkouts: uselessCasting(handler.CheckoutsByRepo()),
 	}
-	ret.SetupMux()
 	return ret
 }
 
@@ -202,7 +201,6 @@ func setupGitServer(cfg config, logger *zap.Logger) (*gitdb.CheckoutHandler, err
 		Checkouts: gitCheckouts,
 		Log:       logger.With(zap.String("class", "checkout_handler")),
 	}
-	ret.SetupMux()
 	return ret, nil
 }
 
@@ -242,15 +240,19 @@ func getRepoKey(repo string) string {
 	return parts2[0]
 }
 
-func setupServer(cfg config, z *zap.Logger, rootTracer *datadog.Tracing, coHandler http.Handler, githubProvider http.Handler) *http.Server {
+func setupServer(cfg config, z *zap.Logger, rootTracer *datadog.Tracing, coHandler *gitdb.CheckoutHandler, githubProvider *github.Provider) *http.Server {
 	mux := rootTracer.CreateRootMux()
 	mux.Handle("/health", HealthHandler(z.With(zap.String("handler", "health"))))
-	mux.Handle("/", coHandler)
 	if githubProvider != nil {
 		z.Info("setting up github provider path")
-		mux.Handle("/public/github", githubProvider)
+		githubProvider.SetupMux(mux)
 	}
-
+	coHandler.SetupMux(mux)
+	mux.NotFoundHandler = http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		z.Info("not found handler")
+		z.With(zap.String("handler", "not_found"), zap.String("url", req.URL.String())).Warn("unknown request")
+		http.NotFoundHandler().ServeHTTP(rw, req)
+	})
 	return &http.Server{
 		Handler: mux,
 		Addr:    cfg.ListenAddr,
