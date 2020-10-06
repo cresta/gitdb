@@ -1,11 +1,14 @@
 package gitdb
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/cresta/gitdb/internal/log"
 
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -15,7 +18,7 @@ import (
 
 type CheckoutHandler struct {
 	Checkouts map[string]*GitCheckout
-	Log       *zap.Logger
+	Log       *log.Logger
 }
 
 func (h *CheckoutHandler) CheckoutsByRepo() map[string]*GitCheckout {
@@ -46,36 +49,35 @@ type getFileResp struct {
 }
 
 type CanHTTPWrite interface {
-	HTTPWrite(w http.ResponseWriter, l *zap.Logger)
+	HTTPWrite(ctx context.Context, w http.ResponseWriter, l *log.Logger)
 }
 
 var _ CanHTTPWrite = &getFileResp{}
 
-func (g *getFileResp) HTTPWrite(w http.ResponseWriter, l *zap.Logger) {
+func (g *getFileResp) HTTPWrite(ctx context.Context, w http.ResponseWriter, l *log.Logger) {
 	w.WriteHeader(g.code)
 	if w != nil {
-		if _, err := g.msg.WriteTo(w); err != nil {
-			l.Error("unable to write final object", zap.Error(err))
-		}
+		_, err := g.msg.WriteTo(w)
+		l.IfErr(err).Error(ctx, "unable to write final object")
 	}
 }
 
-func (h *CheckoutHandler) genericHandler(resp CanHTTPWrite, w http.ResponseWriter, l *zap.Logger) {
-	resp.HTTPWrite(w, l)
+func (h *CheckoutHandler) genericHandler(ctx context.Context, resp CanHTTPWrite, w http.ResponseWriter, l *log.Logger) {
+	resp.HTTPWrite(ctx, w, l)
 }
 
 func (h *CheckoutHandler) refreshAllRepoHandler(w http.ResponseWriter, req *http.Request) {
 	logger := h.Log.With(zap.String("handler", "all_repo"))
 	for repoName, repo := range h.Checkouts {
 		if err := repo.Refresh(req.Context()); err != nil {
-			h.genericHandler(&getFileResp{
+			h.genericHandler(req.Context(), &getFileResp{
 				code: http.StatusInternalServerError,
 				msg:  strings.NewReader(fmt.Sprintf("unable to refresh %s: %v", repoName, err)),
 			}, w, logger.With(zap.String("repo", repoName)))
 			return
 		}
 	}
-	h.genericHandler(&getFileResp{
+	h.genericHandler(req.Context(), &getFileResp{
 		code: http.StatusOK,
 		msg:  strings.NewReader("OK"),
 	}, w, logger)
@@ -87,7 +89,7 @@ func (h *CheckoutHandler) refreshRepoHandler(w http.ResponseWriter, req *http.Re
 	logger := h.Log.With(zap.String("repo", repo))
 	r, exists := h.Checkouts[repo]
 	if !exists {
-		h.genericHandler(&getFileResp{
+		h.genericHandler(req.Context(), &getFileResp{
 			code: http.StatusNotFound,
 			msg:  strings.NewReader(fmt.Sprintf("unknown repo %s", repo)),
 		}, w, logger)
@@ -95,13 +97,13 @@ func (h *CheckoutHandler) refreshRepoHandler(w http.ResponseWriter, req *http.Re
 	}
 	err := r.Refresh(req.Context())
 	if err != nil {
-		h.genericHandler(&getFileResp{
+		h.genericHandler(req.Context(), &getFileResp{
 			code: http.StatusInternalServerError,
 			msg:  strings.NewReader(fmt.Sprintf("unable to fetch remote content %s", err)),
 		}, w, logger)
 		return
 	}
-	h.genericHandler(&getFileResp{
+	h.genericHandler(req.Context(), &getFileResp{
 		code: http.StatusOK,
 		msg:  strings.NewReader("OK"),
 	}, w, logger)
@@ -113,49 +115,49 @@ func (h *CheckoutHandler) getFileHandler(w http.ResponseWriter, req *http.Reques
 	branch := vars["branch"]
 	path := vars["path"]
 	logger := h.Log.With(zap.String("repo", repo), zap.String("branch", branch), zap.String("path", path))
-	logger.Info("get file handler")
+	logger.Info(req.Context(), "get file handler")
 	if repo == "" || branch == "" || path == "" {
 		w.WriteHeader(http.StatusNotFound)
 		if _, err := fmt.Fprintf(w, "One unset{repo: %s, branch: %s, path: %s}", repo, branch, path); err != nil {
-			logger.Warn("unable to find repo/branch/path")
+			logger.Warn(req.Context(), "unable to find repo/branch/path")
 		}
 		return
 	}
-	h.genericHandler(h.getFile(repo, branch, path, logger), w, logger)
+	h.genericHandler(req.Context(), h.getFile(req.Context(), repo, branch, path, logger), w, logger)
 }
 
-func (h *CheckoutHandler) getFile(repo string, branch string, path string, logger *zap.Logger) *getFileResp {
+func (h *CheckoutHandler) getFile(ctx context.Context, repo string, branch string, path string, logger *log.Logger) *getFileResp {
 	r, exists := h.Checkouts[repo]
 	if !exists {
 		buf := strings.NewReader(fmt.Sprintf("unable to find repo %s", repo))
-		logger.Info("invalid repo")
+		logger.Info(ctx, "invalid repo")
 		return &getFileResp{code: http.StatusNotFound, msg: buf}
 	}
 	branchAsRef := plumbing.NewRemoteReferenceName("origin", branch)
-	r, err := r.WithReference(branchAsRef.String())
+	r, err := r.WithReference(ctx, branchAsRef.String())
 	if err != nil {
-		logger.Info("invalid branch", zap.Error(err))
+		logger.Info(ctx, "invalid branch", zap.Error(err))
 		return &getFileResp{
 			code: http.StatusNotFound,
 			msg:  strings.NewReader(fmt.Sprintf("unable to find branch %s for repo %s", branch, repo)),
 		}
 	}
-	f, err := r.FileContent(path)
+	f, err := r.FileContent(ctx, path)
 	if err != nil {
 		if errors.Is(err, object.ErrFileNotFound) {
-			logger.Info("File does not exist", zap.Error(err))
+			logger.Info(ctx, "File does not exist", zap.Error(err))
 			return &getFileResp{
 				code: http.StatusNotFound,
 				msg:  strings.NewReader(fmt.Sprintf("unable to find file %s in branch %s for repo %s", path, branch, repo)),
 			}
 		}
-		logger.Info("internal server error", zap.Error(err))
+		logger.Info(ctx, "internal server error", zap.Error(err))
 		return &getFileResp{
 			code: http.StatusInternalServerError,
 			msg:  strings.NewReader(fmt.Sprintf("Unable to fetch file %s: %s", path, err)),
 		}
 	}
-	logger.Info("fetch ok")
+	logger.Info(ctx, "fetch ok")
 	return &getFileResp{
 		code: http.StatusOK,
 		msg:  f,

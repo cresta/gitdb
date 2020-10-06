@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/cresta/gitdb/internal/log"
+
 	"github.com/go-git/go-git/v5/plumbing/transport"
 
 	"github.com/go-git/go-git/v5"
@@ -15,7 +17,7 @@ import (
 )
 
 type GitOperator struct {
-	Log *zap.Logger
+	Log *log.Logger
 }
 
 func (g *GitOperator) Clone(ctx context.Context, into string, remoteURL string, auth transport.AuthMethod) (*GitCheckout, error) {
@@ -39,7 +41,7 @@ func (g *GitOperator) Clone(ctx context.Context, into string, remoteURL string, 
 type GitCheckout struct {
 	absPath   string
 	repo      *git.Repository
-	log       *zap.Logger
+	log       *log.Logger
 	ref       *plumbing.Reference
 	remoteURL string
 	auth      transport.AuthMethod
@@ -74,12 +76,12 @@ func (g *GitCheckout) RemoteExists(remote string) bool {
 	return r != nil
 }
 
-func (g *GitCheckout) WithReference(refName string) (*GitCheckout, error) {
+func (g *GitCheckout) WithReference(ctx context.Context, refName string) (*GitCheckout, error) {
 	r, err := g.repo.Reference(plumbing.ReferenceName(refName), true)
 	if err != nil {
 		return nil, fmt.Errorf("unable to resolve ref %s: %v", refName, err)
 	}
-	g.log.Info("Switched hash", zap.String("hash", r.Hash().String()))
+	g.log.Info(ctx, "Switched hash", zap.String("hash", r.Hash().String()))
 	return &GitCheckout{
 		absPath:   g.absPath,
 		remoteURL: g.remoteURL,
@@ -89,9 +91,9 @@ func (g *GitCheckout) WithReference(refName string) (*GitCheckout, error) {
 	}, nil
 }
 
-func (g *GitCheckout) LsFiles() ([]string, error) {
-	g.log.Info("asked to list files")
-	defer g.log.Info("list done")
+func (g *GitCheckout) LsFiles(ctx context.Context) ([]string, error) {
+	g.log.Info(ctx, "asked to list files")
+	defer g.log.Info(ctx, "list done")
 	w, err := g.reference()
 	if err != nil {
 		return nil, fmt.Errorf("unable to get repo head: %v", err)
@@ -114,9 +116,9 @@ func (g *GitCheckout) LsFiles() ([]string, error) {
 	return ret, nil
 }
 
-func (g *GitCheckout) FileContent(fileName string) (io.WriterTo, error) {
-	g.log.Info("asked to fetch file", zap.String("file_name", fileName))
-	defer g.log.Info("fetch done")
+func (g *GitCheckout) FileContent(ctx context.Context, fileName string) (io.WriterTo, error) {
+	g.log.Info(ctx, "asked to fetch file", zap.String("file_name", fileName))
+	defer g.log.Info(ctx, "fetch done")
 	w, err := g.reference()
 	if err != nil {
 		return nil, fmt.Errorf("unable to get repo head: %v", err)
@@ -137,7 +139,7 @@ func (g *GitCheckout) FileContent(fileName string) (io.WriterTo, error) {
 
 type readerWriterTo struct {
 	f *object.File
-	z *zap.Logger
+	z *log.Logger
 }
 
 func (r *readerWriterTo) WriteTo(w io.Writer) (n int64, err error) {
@@ -146,9 +148,7 @@ func (r *readerWriterTo) WriteTo(w io.Writer) (n int64, err error) {
 		return 0, fmt.Errorf("unable to make reader : %v", err)
 	}
 	defer func() {
-		if err := rd.Close(); err != nil {
-			r.z.Warn("unable to close file object", zap.Error(err))
-		}
+		r.z.IfErr(rd.Close()).Warn(context.Background(), "unable to close file object")
 	}()
 	return io.Copy(w, rd)
 }

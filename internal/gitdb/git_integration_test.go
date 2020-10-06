@@ -49,7 +49,7 @@ func withRepo(t *testing.T) *GitCheckout {
 func TestGitgitCheckout_LsFiles(t *testing.T) {
 	c := withRepo(t)
 	defer cleanupRepo(t, c)
-	f, err := c.LsFiles()
+	f, err := c.LsFiles(context.Background())
 	require.NoError(t, err)
 	require.Greater(t, len(f), 1)
 }
@@ -62,7 +62,7 @@ func TestGitCheckout_Refresh(t *testing.T) {
 }
 
 func mustResolve(t *testing.T, c *GitCheckout, ref string) *GitCheckout {
-	ret, err := c.WithReference(ref)
+	ret, err := c.WithReference(context.Background(), ref)
 	require.NoError(t, err)
 	return ret
 }
@@ -73,7 +73,7 @@ func TestGitgitCheckout_FileContent(t *testing.T) {
 	staging := mustResolve(t, defaultCheckout, stagingRef)
 	mustExist := func(c *GitCheckout, name string, expectedContent string) func(t *testing.T) {
 		return func(t *testing.T) {
-			content, err := c.FileContent(name)
+			content, err := c.FileContent(context.Background(), name)
 			require.NoError(t, err)
 			var b bytes.Buffer
 			numBytes, err := content.WriteTo(&b)
@@ -85,7 +85,7 @@ func TestGitgitCheckout_FileContent(t *testing.T) {
 
 	mustNotExist := func(c *GitCheckout, name string) func(t *testing.T) {
 		return func(t *testing.T) {
-			badContent, err := c.FileContent(name)
+			badContent, err := c.FileContent(context.Background(), name)
 			require.Error(t, err)
 			require.Nil(t, badContent)
 		}

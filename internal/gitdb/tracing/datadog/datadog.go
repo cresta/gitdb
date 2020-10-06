@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cresta/gitdb/internal/log"
+
 	"github.com/gorilla/mux"
 
 	"go.uber.org/zap"
@@ -18,9 +20,9 @@ import (
 const ddApmFile = "/var/run/datadog/apm.socket"
 const ddStatsFile = "/var/run/datadog/dsd.socket"
 
-func NewTracer(logger *zap.Logger) *Tracing {
+func NewTracer(logger *log.Logger) *Tracing {
 	if !fileExists(ddApmFile) {
-		logger.Info("Unable to find datadog APM file", zap.String("file_name", ddApmFile))
+		logger.Info(context.Background(), "Unable to find datadog APM file", zap.String("file_name", ddApmFile))
 		return nil
 	}
 	u := &unixRoundTripper{
@@ -29,7 +31,7 @@ func NewTracer(logger *zap.Logger) *Tracing {
 	}
 
 	tracer.Start(tracer.WithRuntimeMetrics(), tracer.WithHTTPRoundTripper(u), tracer.WithDogstatsdAddress("unix://"+ddStatsFile), tracer.WithLogger(ddZappedLogger{logger}))
-	logger.Info("DataDog tracing enabled")
+	logger.Info(context.Background(), "DataDog tracing enabled")
 	return &Tracing{}
 }
 
@@ -50,7 +52,7 @@ func (t *Tracing) CreateRootMux() *mux.Router {
 	wrapped := ddhttp.NewServeMux(ddhttp.WithServiceName("gitdb"))
 
 	retMux := mux.NewRouter()
-	retMux.Use(func(handler http.Handler) http.Handler {
+	retMux.Use(func(abc http.Handler) http.Handler {
 		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			a, _ := wrapped.Handler(request)
 			a.ServeHTTP(writer, request)
@@ -68,11 +70,11 @@ func fileExists(filename string) bool {
 }
 
 type ddZappedLogger struct {
-	*zap.Logger
+	*log.Logger
 }
 
 func (d ddZappedLogger) Log(msg string) {
-	d.Logger.Info(msg)
+	d.Logger.Info(context.Background(), msg)
 }
 
 type unixRoundTripper struct {
