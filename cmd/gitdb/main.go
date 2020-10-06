@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/cresta/gitdb/internal/gitdb/repoprovider/github"
 	"io"
 	"io/ioutil"
 	"net"
@@ -27,6 +28,7 @@ type config struct {
 	Repos            string
 	PrivateKey       string
 	PrivateKeyPasswd string
+	GithubPushToken  string
 }
 
 func (c config) WithDefaults() config {
@@ -46,6 +48,7 @@ func getConfig() config {
 		DataDirectory:    os.Getenv("DATA_DIRECTORY"),
 		Repos:            os.Getenv("GITDB_REPOS"),
 		PrivateKey:       os.Getenv("GITDB_PRIVATE_KEY"),
+		GithubPushToken:  os.Getenv("GITHUB_PUSH_TOKEN"),
 		PrivateKeyPasswd: os.Getenv("GITDB_PRIVATE_KEY_PASSWD"),
 	}.WithDefaults()
 }
@@ -94,7 +97,8 @@ func (m *Service) Main() {
 		m.osExit(1)
 		return
 	}
-	m.server = setupServer(cfg, m.log, rootTracer, co)
+	githubListener := setupGithubListener(cfg, m.log, co)
+	m.server = setupServer(cfg, m.log, rootTracer, co, githubListener)
 
 	ln, err := net.Listen("tcp", m.server.Addr)
 	if err != nil {
@@ -137,6 +141,28 @@ func getPublicKey(k []transport.AuthMethod, idx int) transport.AuthMethod {
 		return nil
 	}
 	return k[idx]
+}
+
+func setupGithubListener(cfg config, logger *zap.Logger, handler *gitdb.CheckoutHandler) *github.Provider {
+	if cfg.GithubPushToken == "" {
+		logger.Info("no github push token.  Not setting up github push notifier")
+		return nil
+	}
+	ret := &github.Provider{
+		Token:     []byte(cfg.GithubPushToken),
+		Logger:    logger.With(zap.String("class", "github.Provider")),
+		Checkouts: uselessCasting(handler.CheckoutsByRepo()),
+	}
+	ret.SetupMux()
+	return ret
+}
+
+func uselessCasting(in map[string]*gitdb.GitCheckout) map[string]github.GitCheckout {
+	ret := make(map[string]github.GitCheckout)
+	for k, v := range in {
+		ret[k] = v
+	}
+	return ret
 }
 
 func setupGitServer(cfg config, logger *zap.Logger) (*gitdb.CheckoutHandler, error) {
@@ -215,10 +241,14 @@ func getRepoKey(repo string) string {
 	return parts2[0]
 }
 
-func setupServer(cfg config, z *zap.Logger, rootTracer *datadog.Tracing, coHandler http.Handler) *http.Server {
+func setupServer(cfg config, z *zap.Logger, rootTracer *datadog.Tracing, coHandler http.Handler, githubProvider *github.Provider) *http.Server {
 	mux := rootTracer.CreateRootMux()
 	mux.Handle("/health", HealthHandler(z.With(zap.String("handler", "health"))))
 	mux.Handle("/", coHandler)
+	if githubProvider != nil {
+		z.Info("setting up github provider path")
+		mux.Handle("/public/github", githubProvider)
+	}
 
 	return &http.Server{
 		Handler: mux,
