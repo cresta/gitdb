@@ -27,9 +27,10 @@ func TestServer(t *testing.T) {
 		},
 		log: testhelp.ZapTestingLogger(t),
 		config: config{
-			ListenAddr:    ":0",
-			DataDirectory: "",
-			Repos:         "git@github.com:cresta/gitdb-reference.git",
+			ListenAddr:      ":0",
+			DataDirectory:   "",
+			Repos:           "git@github.com:cresta/gitdb-reference.git",
+			GithubPushToken: "abc123",
 		},
 		onListen: func(l net.Listener) {
 			listenDone <- l.(*net.TCPListener).Addr().(*net.TCPAddr).Port
@@ -64,6 +65,11 @@ func TestServer(t *testing.T) {
 		resp, err := http.Get(fmt.Sprintf("http://localhost:%d/unknown", sendPort))
 		require.NoError(t, err)
 		require.Equal(t, http.StatusNotFound, resp.StatusCode)
+	})
+	t.Run("github_event_invalid_body", func(t *testing.T) {
+		resp, err := http.Get(fmt.Sprintf("http://localhost:%d/public/github/push_event", sendPort))
+		require.NoError(t, err)
+		require.Equal(t, http.StatusForbidden, resp.StatusCode)
 	})
 
 	require.NoError(t, s.server.Shutdown(context.Background()))

@@ -21,13 +21,6 @@ type Provider struct {
 	Token     []byte
 	Logger    *zap.Logger
 	Checkouts map[string]GitCheckout
-	mux       *mux.Router
-}
-
-var _ http.Handler = &Provider{}
-
-func (p *Provider) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	p.mux.ServeHTTP(rw, req)
 }
 
 type pushEventResponse struct {
@@ -50,16 +43,8 @@ func (g *pushEventResponse) HTTPWrite(w http.ResponseWriter, l *zap.Logger) {
 	}
 }
 
-func (p *Provider) SetupMux() {
-	if p.mux != nil {
-		panic("do not call setup twice")
-	}
-	p.mux = mux.NewRouter()
-	p.mux.Methods(http.MethodGet).Path("/public/github/push_event").HandlerFunc(p.PushEventHandler)
-	p.mux.HandleFunc("/", func(rw http.ResponseWriter, req *http.Request) {
-		p.Logger.Info("not found handler")
-		http.NotFoundHandler().ServeHTTP(rw, req)
-	})
+func (p *Provider) SetupMux(mux *mux.Router) {
+	mux.Methods(http.MethodGet).Path("/public/github/push_event").HandlerFunc(p.PushEventHandler)
 }
 
 func (p *Provider) genericHandler(resp CanHTTPWrite, w http.ResponseWriter, l *zap.Logger) {

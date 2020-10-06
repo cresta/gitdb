@@ -16,7 +16,6 @@ import (
 type CheckoutHandler struct {
 	Checkouts map[string]*GitCheckout
 	Log       *zap.Logger
-	mux       *mux.Router
 }
 
 func (h *CheckoutHandler) CheckoutsByRepo() map[string]*GitCheckout {
@@ -35,26 +34,11 @@ type CoreMux interface {
 
 var _ CoreMux = http.NewServeMux()
 
-func (h *CheckoutHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	h.mux.ServeHTTP(w, req)
+func (h *CheckoutHandler) SetupMux(mux *mux.Router) {
+	mux.Methods(http.MethodGet).Path("/file/{repo}/{branch}/{path:.*}").HandlerFunc(h.getFileHandler)
+	mux.Methods(http.MethodPost).Path("/refresh/{repo}").HandlerFunc(h.refreshRepoHandler)
+	mux.Methods(http.MethodPost).Path("/refreshall").HandlerFunc(h.refreshAllRepoHandler)
 }
-
-func (h *CheckoutHandler) SetupMux() {
-	if h.mux != nil {
-		panic("do not call setup twice")
-	}
-	h.mux = mux.NewRouter()
-	h.mux.Methods(http.MethodGet).Path("/file/{repo}/{branch}/{path:.*}").HandlerFunc(h.getFileHandler)
-	h.mux.Methods(http.MethodPost).Path("/refresh/{repo}").HandlerFunc(h.refreshRepoHandler)
-	h.mux.Methods(http.MethodPost).Path("/refreshall").HandlerFunc(h.refreshAllRepoHandler)
-	h.mux.HandleFunc("/", func(rw http.ResponseWriter, req *http.Request) {
-		h.Log.Info("not found handler")
-		(&ContextZapLogger{h.Log}).With(req.Context()).With(zap.String("handler", "not_found"), zap.String("url", req.URL.String())).Warn("unknown request")
-		http.NotFoundHandler().ServeHTTP(rw, req)
-	})
-}
-
-var _ http.Handler = &CheckoutHandler{}
 
 type getFileResp struct {
 	code int
