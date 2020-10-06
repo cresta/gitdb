@@ -49,6 +49,12 @@ func TestServer(t *testing.T) {
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 		require.Equal(t, "OK", requiredRead(t, resp.Body))
 	})
+	t.Run("test_refresh", func(t *testing.T) {
+		resp, err := http.Post(fmt.Sprintf("http://localhost:%d/refresh/gitdb-reference", sendPort), "", nil)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		require.Equal(t, "OK", requiredRead(t, resp.Body))
+	})
 	t.Run("fetch_file", func(t *testing.T) {
 		resp, err := http.Get(fmt.Sprintf("http://localhost:%d/file/gitdb-reference/master/on_master.txt", sendPort))
 		require.NoError(t, err)

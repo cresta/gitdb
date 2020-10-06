@@ -30,6 +30,7 @@ func (g *GitOperator) Clone(ctx context.Context, into string, remoteURL string, 
 	return &GitCheckout{
 		repo:      repo,
 		absPath:   into,
+		auth:      auth,
 		remoteURL: remoteURL,
 		log:       g.Log.With(zap.String("repo", remoteURL)),
 	}, nil
@@ -41,10 +42,13 @@ type GitCheckout struct {
 	log       *zap.Logger
 	ref       *plumbing.Reference
 	remoteURL string
+	auth      transport.AuthMethod
 }
 
 func (g *GitCheckout) Refresh(ctx context.Context) error {
-	err := g.repo.FetchContext(ctx, &git.FetchOptions{})
+	err := g.repo.FetchContext(ctx, &git.FetchOptions{
+		Auth: g.auth,
+	})
 	if err == nil || errors.Is(err, git.NoErrAlreadyUpToDate) {
 		return nil
 	}
