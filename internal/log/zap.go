@@ -33,7 +33,7 @@ func Fields(ctx context.Context) []zap.Field {
 	return existingFieldsVal.([]zap.Field)
 }
 
-func GetLogger(z *zap.Logger, ctx context.Context) *zap.Logger {
+func GetLogger(ctx context.Context, z *zap.Logger) *zap.Logger {
 	return z.With(Fields(ctx)...)
 }
 
@@ -51,28 +51,28 @@ func (l *Logger) Info(ctx context.Context, msg string, fields ...zap.Field) {
 	if l == nil {
 		return
 	}
-	GetLogger(l.root, ctx).Info(msg, fields...)
+	GetLogger(ctx, l.root).Info(msg, fields...)
 }
 
 func (l *Logger) Warn(ctx context.Context, msg string, fields ...zap.Field) {
 	if l == nil {
 		return
 	}
-	GetLogger(l.root, ctx).Warn(msg, fields...)
+	GetLogger(ctx, l.root).Warn(msg, fields...)
 }
 
 func (l *Logger) Error(ctx context.Context, msg string, fields ...zap.Field) {
 	if l == nil {
 		return
 	}
-	GetLogger(l.root, ctx).Error(msg, fields...)
+	GetLogger(ctx, l.root).Error(msg, fields...)
 }
 
 func (l *Logger) Panic(ctx context.Context, msg string, fields ...zap.Field) {
 	if l == nil {
 		return
 	}
-	GetLogger(l.root, ctx).Panic(msg, fields...)
+	GetLogger(ctx, l.root).Panic(msg, fields...)
 }
 
 func (l *Logger) IfErr(err error) *Logger {
