@@ -66,10 +66,10 @@ func (p *Provider) genericHandler(resp CanHTTPWrite, w http.ResponseWriter, l *z
 }
 
 func (p *Provider) PushEventHandler(w http.ResponseWriter, req *http.Request) {
-	p.genericHandler(p.PushEvent(req), w, p.Logger)
+	p.genericHandler(p.pushEvent(req), w, p.Logger)
 }
 
-func (p *Provider) PushEvent(req *http.Request) *pushEventResponse {
+func (p *Provider) pushEvent(req *http.Request) *pushEventResponse {
 	p.Logger.Info("got push event")
 	body, err := github.ValidatePayload(req, p.Token)
 	if err != nil {
