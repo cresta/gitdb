@@ -5,6 +5,7 @@ go 1.14
 require (
 	github.com/DataDog/datadog-go v4.0.0+incompatible // indirect
 	github.com/go-git/go-git/v5 v5.1.0
+	github.com/google/go-github/v32 v32.1.0
 	github.com/google/uuid v1.1.2 // indirect
 	github.com/gorilla/mux v1.8.0
 	github.com/opentracing/opentracing-go v1.2.0 // indirect

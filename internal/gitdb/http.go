@@ -19,6 +19,14 @@ type CheckoutHandler struct {
 	mux       *mux.Router
 }
 
+func (h *CheckoutHandler) CheckoutsByRepo() map[string]*GitCheckout {
+	ret := make(map[string]*GitCheckout)
+	for _, c := range h.Checkouts {
+		ret[c.remoteURL] = c
+	}
+	return ret
+}
+
 type CoreMux interface {
 	ServeHTTP(w http.ResponseWriter, r *http.Request)
 	Handle(pattern string, handler http.Handler)
@@ -38,7 +46,7 @@ func (h *CheckoutHandler) SetupMux() {
 	h.mux = mux.NewRouter()
 	h.mux.Methods(http.MethodGet).Path("/file/{repo}/{branch}/{path:.*}").HandlerFunc(h.getFileHandler)
 	h.mux.Methods(http.MethodPost).Path("/refresh/{repo}").HandlerFunc(h.refreshRepoHandler)
-	h.mux.Methods(http.MethodPost).Path("/refresh").HandlerFunc(h.refreshAllRepoHandler)
+	h.mux.Methods(http.MethodPost).Path("/refreshall").HandlerFunc(h.refreshAllRepoHandler)
 	h.mux.HandleFunc("/", func(rw http.ResponseWriter, req *http.Request) {
 		h.Log.Info("not found handler")
 		(&ContextZapLogger{h.Log}).With(req.Context()).With(zap.String("handler", "not_found"), zap.String("url", req.URL.String())).Warn("unknown request")
