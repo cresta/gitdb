@@ -4,12 +4,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cresta/gitdb/internal/log"
+
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
-func ZapTestingLogger(t *testing.T) *zap.Logger {
-	return zap.New(
+func ZapTestingLogger(t *testing.T) *log.Logger {
+	return log.New(zap.New(
 		zapcore.NewCore(
 			zapcore.NewConsoleEncoder(zapcore.EncoderConfig{
 				MessageKey:     "msg",
@@ -21,7 +23,7 @@ func ZapTestingLogger(t *testing.T) *zap.Logger {
 			}),
 			zapcore.AddSync(&LogSync{t: t}),
 			zap.DebugLevel),
-	)
+	))
 }
 
 type LogSync struct {

@@ -10,6 +10,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/cresta/gitdb/internal/log"
+
 	"github.com/cresta/gitdb/internal/gitdb/repoprovider/github"
 
 	"github.com/cresta/gitdb/internal/gitdb"
@@ -61,7 +63,7 @@ func main() {
 type Service struct {
 	osExit   func(int)
 	config   config
-	log      *zap.Logger
+	log      *log.Logger
 	onListen func(net.Listener)
 	server   *http.Server
 }
@@ -71,12 +73,12 @@ var instance = Service{
 	config: getConfig(),
 }
 
-func setupLogging() (*zap.Logger, error) {
+func setupLogging() (*log.Logger, error) {
 	l, err := zap.NewProduction()
 	if err != nil {
 		return nil, err
 	}
-	return l, nil
+	return log.New(l), nil
 }
 
 func (m *Service) Main() {
@@ -90,11 +92,11 @@ func (m *Service) Main() {
 			return
 		}
 	}
-	m.log.Info("Starting")
+	m.log.Info(context.Background(), "Starting")
 	rootTracer := datadog.NewTracer(m.log.With(zap.String("section", "setup_tracing")))
 	co, err := setupGitServer(cfg, m.log)
 	if err != nil {
-		m.log.Panic("uanble to setup git server", zap.Error(err))
+		m.log.IfErr(err).Panic(context.Background(), "unable to setup git server")
 		m.osExit(1)
 		return
 	}
@@ -103,7 +105,7 @@ func (m *Service) Main() {
 
 	ln, err := net.Listen("tcp", m.server.Addr)
 	if err != nil {
-		m.log.Panic("unable to listen to port", zap.Error(err), zap.String("addr", m.server.Addr))
+		m.log.Panic(context.Background(), "unable to listen to port", zap.Error(err), zap.String("addr", m.server.Addr))
 		m.osExit(1)
 		return
 	}
@@ -113,9 +115,9 @@ func (m *Service) Main() {
 
 	serveErr := m.server.Serve(ln)
 	if serveErr != http.ErrServerClosed {
-		gitdb.LogIfErr(m.log, serveErr, "server exited")
+		m.log.IfErr(serveErr).Error(context.Background(), "server existed")
 	}
-	m.log.Info("Server finished")
+	m.log.Info(context.Background(), "Server finished")
 	if serveErr != nil {
 		m.osExit(1)
 	}
@@ -144,9 +146,9 @@ func getPublicKey(k []transport.AuthMethod, idx int) transport.AuthMethod {
 	return k[idx]
 }
 
-func setupGithubListener(cfg config, logger *zap.Logger, handler *gitdb.CheckoutHandler) *github.Provider {
+func setupGithubListener(cfg config, logger *log.Logger, handler *gitdb.CheckoutHandler) *github.Provider {
 	if cfg.GithubPushToken == "" {
-		logger.Info("no github push token.  Not setting up github push notifier")
+		logger.Info(context.Background(), "no github push token.  Not setting up github push notifier")
 		return nil
 	}
 	ret := &github.Provider{
@@ -165,8 +167,8 @@ func uselessCasting(in map[string]*gitdb.GitCheckout) map[string]github.GitCheck
 	return ret
 }
 
-func setupGitServer(cfg config, logger *zap.Logger) (*gitdb.CheckoutHandler, error) {
-	logger.Info("setting up git server")
+func setupGitServer(cfg config, logger *log.Logger) (*gitdb.CheckoutHandler, error) {
+	logger.Info(context.Background(), "setting up git server")
 	publicKeys, err := getPrivateKeys(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load private key: %v", err)
@@ -195,7 +197,7 @@ func setupGitServer(cfg config, logger *zap.Logger) (*gitdb.CheckoutHandler, err
 			return nil, fmt.Errorf("unable to clone repo %s: %v", repo, err)
 		}
 		gitCheckouts[getRepoKey(repo)] = co
-		logger.Info("setup checkout", zap.String("repo", repo), zap.String("key", getRepoKey(repo)))
+		logger.Info(context.Background(), "setup checkout", zap.String("repo", repo), zap.String("key", getRepoKey(repo)))
 	}
 	ret := &gitdb.CheckoutHandler{
 		Checkouts: gitCheckouts,
@@ -240,17 +242,18 @@ func getRepoKey(repo string) string {
 	return parts2[0]
 }
 
-func setupServer(cfg config, z *zap.Logger, rootTracer *datadog.Tracing, coHandler *gitdb.CheckoutHandler, githubProvider *github.Provider) *http.Server {
+func setupServer(cfg config, z *log.Logger, rootTracer *datadog.Tracing, coHandler *gitdb.CheckoutHandler, githubProvider *github.Provider) *http.Server {
 	mux := rootTracer.CreateRootMux()
+
 	mux.Handle("/health", HealthHandler(z.With(zap.String("handler", "health"))))
 	if githubProvider != nil {
-		z.Info("setting up github provider path")
+		z.Info(context.Background(), "setting up github provider path")
 		githubProvider.SetupMux(mux)
 	}
 	coHandler.SetupMux(mux)
 	mux.NotFoundHandler = http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		z.Info("not found handler")
-		z.With(zap.String("handler", "not_found"), zap.String("url", req.URL.String())).Warn("unknown request")
+		z.Info(context.Background(), "not found handler")
+		z.With(zap.String("handler", "not_found"), zap.String("url", req.URL.String())).Warn(context.Background(), "unknown request")
 		http.NotFoundHandler().ServeHTTP(rw, req)
 	})
 	return &http.Server{
@@ -259,11 +262,11 @@ func setupServer(cfg config, z *zap.Logger, rootTracer *datadog.Tracing, coHandl
 	}
 }
 
-func HealthHandler(z *zap.Logger) http.Handler {
+func HealthHandler(z *log.Logger) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		attachTag(req.Context(), "sampling.priority", 0)
 		_, err := io.WriteString(rw, "OK")
-		gitdb.LogIfErr(z, err, "unable to write back health response")
+		z.IfErr(err).Warn(req.Context(), "unable to write back health response")
 	})
 }
 
