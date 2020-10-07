@@ -45,7 +45,7 @@ func (g *pushEventResponse) HTTPWrite(ctx context.Context, w http.ResponseWriter
 }
 
 func (p *Provider) SetupMux(mux *mux.Router) {
-	mux.Methods(http.MethodPost).Path("/public/github/push_event").HandlerFunc(p.PushEventHandler)
+	mux.Methods(http.MethodPost).Path("/public/github/push_event").HandlerFunc(p.PushEventHandler).Name("push_event")
 }
 
 func (p *Provider) genericHandler(ctx context.Context, resp CanHTTPWrite, w http.ResponseWriter, l *log.Logger) {

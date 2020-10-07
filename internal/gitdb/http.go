@@ -38,9 +38,9 @@ type CoreMux interface {
 var _ CoreMux = http.NewServeMux()
 
 func (h *CheckoutHandler) SetupMux(mux *mux.Router) {
-	mux.Methods(http.MethodGet).Path("/file/{repo}/{branch}/{path:.*}").HandlerFunc(h.getFileHandler)
-	mux.Methods(http.MethodPost).Path("/refresh/{repo}").HandlerFunc(h.refreshRepoHandler)
-	mux.Methods(http.MethodPost).Path("/refreshall").HandlerFunc(h.refreshAllRepoHandler)
+	mux.Methods(http.MethodGet).Path("/file/{repo}/{branch}/{path:.*}").HandlerFunc(h.getFileHandler).Name("get_file_handler")
+	mux.Methods(http.MethodPost).Path("/refresh/{repo}").HandlerFunc(h.refreshRepoHandler).Name("refresh_repo")
+	mux.Methods(http.MethodPost).Path("/refreshall").HandlerFunc(h.refreshAllRepoHandler).Name("refresh_all")
 }
 
 type getFileResp struct {

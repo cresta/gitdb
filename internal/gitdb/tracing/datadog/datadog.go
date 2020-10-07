@@ -10,9 +10,8 @@ import (
 
 	"github.com/cresta/gitdb/internal/log"
 
-	"github.com/gorilla/mux"
-
 	"go.uber.org/zap"
+	ddtrace2 "gopkg.in/DataDog/dd-trace-go.v1/contrib/gorilla/mux"
 	ddhttp "gopkg.in/DataDog/dd-trace-go.v1/contrib/net/http"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
@@ -45,20 +44,8 @@ func (t *Tracing) WrapRoundTrip(rt http.RoundTripper) http.RoundTripper {
 	return ddhttp.WrapRoundTripper(rt)
 }
 
-func (t *Tracing) CreateRootMux() *mux.Router {
-	if t == nil {
-		return mux.NewRouter()
-	}
-	wrapped := ddhttp.NewServeMux(ddhttp.WithServiceName("gitdb"))
-
-	retMux := mux.NewRouter()
-	retMux.Use(func(abc http.Handler) http.Handler {
-		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-			a, _ := wrapped.Handler(request)
-			a.ServeHTTP(writer, request)
-		})
-	})
-	return retMux
+func (t *Tracing) CreateRootMux() *ddtrace2.Router {
+	return ddtrace2.NewRouter(ddtrace2.WithServiceName("gitdb"))
 }
 
 func fileExists(filename string) bool {
