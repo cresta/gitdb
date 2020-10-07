@@ -97,6 +97,7 @@ func (m *Service) Main() {
 		m.osExit(1)
 		return
 	}
+	m.log = m.log.DynamicFields(rootTracer.DynamicFields()...)
 
 	co, err := gitdb.NewHandler(m.log, gitdb.Config{
 		DataDirectory:    cfg.DataDirectory,

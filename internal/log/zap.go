@@ -3,8 +3,6 @@ package log
 import (
 	"context"
 
-	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
-
 	"go.uber.org/zap"
 )
 
@@ -35,10 +33,6 @@ func fields(ctx context.Context) []zap.Field {
 	return existingFieldsVal.([]zap.Field)
 }
 
-func GetLogger(ctx context.Context, z *zap.Logger) *zap.Logger {
-	return z.With(fields(ctx)...).With(datadogFields(ctx)...)
-}
-
 func New(root *zap.Logger) *Logger {
 	return &Logger{
 		root: root,
@@ -52,33 +46,41 @@ type Logger struct {
 	dynamicFields []DynamicFields
 }
 
+func (l *Logger) logger(ctx context.Context) *zap.Logger {
+	allFields := fields(ctx)
+	for _, d := range l.dynamicFields {
+		allFields = append(allFields, d(ctx)...)
+	}
+	return l.root.With(allFields...).WithOptions(zap.AddCallerSkip(2))
+}
+
 func (l *Logger) Info(ctx context.Context, msg string, fields ...zap.Field) {
 	if l == nil {
 		return
 	}
 	l.root.WithOptions(zap.Hooks())
-	GetLogger(ctx, l.root).WithOptions(zap.AddCallerSkip(1)).Info(msg, fields...)
+	l.logger(ctx).Info(msg, fields...)
 }
 
 func (l *Logger) Warn(ctx context.Context, msg string, fields ...zap.Field) {
 	if l == nil {
 		return
 	}
-	GetLogger(ctx, l.root).WithOptions(zap.AddCallerSkip(1)).Warn(msg, fields...)
+	l.logger(ctx).Warn(msg, fields...)
 }
 
 func (l *Logger) Error(ctx context.Context, msg string, fields ...zap.Field) {
 	if l == nil {
 		return
 	}
-	GetLogger(ctx, l.root).WithOptions(zap.AddCallerSkip(1)).Error(msg, fields...)
+	l.logger(ctx).Error(msg, fields...)
 }
 
 func (l *Logger) Panic(ctx context.Context, msg string, fields ...zap.Field) {
 	if l == nil {
 		return
 	}
-	GetLogger(ctx, l.root).WithOptions(zap.AddCallerSkip(1)).Panic(msg, fields...)
+	l.logger(ctx).Panic(msg, fields...)
 }
 
 func (l *Logger) IfErr(err error) *Logger {
@@ -104,17 +106,5 @@ func (l *Logger) With(fields ...zap.Field) *Logger {
 	}
 	return &Logger{
 		root: l.root.With(fields...),
-	}
-}
-
-// TODO: Move this out of this file
-func datadogFields(ctx context.Context) []zap.Field {
-	sp, ok := tracer.SpanFromContext(ctx)
-	if !ok || sp.Context().TraceID() == 0 {
-		return nil
-	}
-	return []zap.Field{
-		zap.Uint64("dd.trace_id", sp.Context().TraceID()),
-		zap.Uint64("dd.span_id", sp.Context().SpanID()),
 	}
 }
