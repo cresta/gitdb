@@ -49,7 +49,6 @@ func LogMiddleware(logger *log.Logger) func(handler http.Handler) http.Handler {
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			start := time.Now()
-			logger.Info(request.Context(), "start request")
 			defer func() {
 				logger.Info(request.Context(), "end request", zap.Duration("total_time", time.Since(start)))
 			}()
