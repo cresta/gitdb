@@ -78,6 +78,9 @@ func (l *Logger) Panic(ctx context.Context, msg string, fields ...zap.Field) {
 }
 
 func (l *Logger) IfErr(err error) *Logger {
+	if err == nil {
+		return nil
+	}
 	return l.With(zap.Error(err))
 }
 
