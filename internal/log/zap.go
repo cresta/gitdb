@@ -3,8 +3,6 @@ package log
 import (
 	"context"
 
-	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
-
 	"go.uber.org/zap"
 )
 
@@ -27,16 +25,12 @@ func With(ctx context.Context, fields ...zap.Field) context.Context {
 	return context.WithValue(ctx, loggerKey, newFields)
 }
 
-func Fields(ctx context.Context) []zap.Field {
+func fields(ctx context.Context) []zap.Field {
 	existingFieldsVal := ctx.Value(loggerKey)
 	if existingFieldsVal == nil {
 		return nil
 	}
 	return existingFieldsVal.([]zap.Field)
-}
-
-func GetLogger(ctx context.Context, z *zap.Logger) *zap.Logger {
-	return z.With(Fields(ctx)...).With(datadogFields(ctx)...)
 }
 
 func New(root *zap.Logger) *Logger {
@@ -45,36 +39,48 @@ func New(root *zap.Logger) *Logger {
 	}
 }
 
+type DynamicFields func(ctx context.Context) []zap.Field
+
 type Logger struct {
-	root *zap.Logger
+	root          *zap.Logger
+	dynamicFields []DynamicFields
+}
+
+func (l *Logger) logger(ctx context.Context) *zap.Logger {
+	allFields := fields(ctx)
+	for _, d := range l.dynamicFields {
+		allFields = append(allFields, d(ctx)...)
+	}
+	return l.root.With(allFields...).WithOptions(zap.AddCallerSkip(2))
 }
 
 func (l *Logger) Info(ctx context.Context, msg string, fields ...zap.Field) {
 	if l == nil {
 		return
 	}
-	GetLogger(ctx, l.root).WithOptions(zap.AddCallerSkip(1)).Info(msg, fields...)
+	l.root.WithOptions(zap.Hooks())
+	l.logger(ctx).Info(msg, fields...)
 }
 
 func (l *Logger) Warn(ctx context.Context, msg string, fields ...zap.Field) {
 	if l == nil {
 		return
 	}
-	GetLogger(ctx, l.root).WithOptions(zap.AddCallerSkip(1)).Warn(msg, fields...)
+	l.logger(ctx).Warn(msg, fields...)
 }
 
 func (l *Logger) Error(ctx context.Context, msg string, fields ...zap.Field) {
 	if l == nil {
 		return
 	}
-	GetLogger(ctx, l.root).WithOptions(zap.AddCallerSkip(1)).Error(msg, fields...)
+	l.logger(ctx).Error(msg, fields...)
 }
 
 func (l *Logger) Panic(ctx context.Context, msg string, fields ...zap.Field) {
 	if l == nil {
 		return
 	}
-	GetLogger(ctx, l.root).WithOptions(zap.AddCallerSkip(1)).Panic(msg, fields...)
+	l.logger(ctx).Panic(msg, fields...)
 }
 
 func (l *Logger) IfErr(err error) *Logger {
@@ -84,22 +90,21 @@ func (l *Logger) IfErr(err error) *Logger {
 	return l.With(zap.Error(err))
 }
 
+func (l *Logger) DynamicFields(dynamicFields ...DynamicFields) *Logger {
+	ret := &Logger{
+		root:          l.root,
+		dynamicFields: make([]DynamicFields, 0, len(dynamicFields)+len(l.dynamicFields)),
+	}
+	ret.dynamicFields = append(ret.dynamicFields, l.dynamicFields...)
+	ret.dynamicFields = append(ret.dynamicFields, dynamicFields...)
+	return ret
+}
+
 func (l *Logger) With(fields ...zap.Field) *Logger {
 	if l == nil {
 		return nil
 	}
 	return &Logger{
 		root: l.root.With(fields...),
-	}
-}
-
-func datadogFields(ctx context.Context) []zap.Field {
-	sp, ok := tracer.SpanFromContext(ctx)
-	if !ok || sp.Context().TraceID() == 0 {
-		return nil
-	}
-	return []zap.Field{
-		zap.Uint64("dd.trace_id", sp.Context().TraceID()),
-		zap.Uint64("dd.span_id", sp.Context().SpanID()),
 	}
 }
