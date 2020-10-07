@@ -53,28 +53,28 @@ func (l *Logger) Info(ctx context.Context, msg string, fields ...zap.Field) {
 	if l == nil {
 		return
 	}
-	GetLogger(ctx, l.root).Info(msg, fields...)
+	GetLogger(ctx, l.root).WithOptions(zap.AddCallerSkip(1)).Info(msg, fields...)
 }
 
 func (l *Logger) Warn(ctx context.Context, msg string, fields ...zap.Field) {
 	if l == nil {
 		return
 	}
-	GetLogger(ctx, l.root).Warn(msg, fields...)
+	GetLogger(ctx, l.root).WithOptions(zap.AddCallerSkip(1)).Warn(msg, fields...)
 }
 
 func (l *Logger) Error(ctx context.Context, msg string, fields ...zap.Field) {
 	if l == nil {
 		return
 	}
-	GetLogger(ctx, l.root).Error(msg, fields...)
+	GetLogger(ctx, l.root).WithOptions(zap.AddCallerSkip(1)).Error(msg, fields...)
 }
 
 func (l *Logger) Panic(ctx context.Context, msg string, fields ...zap.Field) {
 	if l == nil {
 		return
 	}
-	GetLogger(ctx, l.root).Panic(msg, fields...)
+	GetLogger(ctx, l.root).WithOptions(zap.AddCallerSkip(1)).Panic(msg, fields...)
 }
 
 func (l *Logger) IfErr(err error) *Logger {
@@ -95,7 +95,7 @@ func (l *Logger) With(fields ...zap.Field) *Logger {
 
 func datadogFields(ctx context.Context) []zap.Field {
 	sp, ok := tracer.SpanFromContext(ctx)
-	if !ok {
+	if !ok || sp.Context().TraceID() == 0 {
 		return nil
 	}
 	return []zap.Field{
