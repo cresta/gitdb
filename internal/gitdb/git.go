@@ -14,6 +14,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"go.uber.org/zap"
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
 
 type GitOperator struct {
@@ -21,6 +22,8 @@ type GitOperator struct {
 }
 
 func (g *GitOperator) Clone(ctx context.Context, into string, remoteURL string, auth transport.AuthMethod) (*GitCheckout, error) {
+	span, ctx := tracer.StartSpanFromContext(ctx, "clone")
+	defer span.Finish()
 	repo, err := git.PlainCloneContext(ctx, into, true, &git.CloneOptions{
 		URL:   remoteURL,
 		Depth: 1,
@@ -48,6 +51,8 @@ type GitCheckout struct {
 }
 
 func (g *GitCheckout) Refresh(ctx context.Context) error {
+	span, ctx := tracer.StartSpanFromContext(ctx, "refresh")
+	defer span.Finish()
 	err := g.repo.FetchContext(ctx, &git.FetchOptions{
 		Auth: g.auth,
 	})
@@ -92,6 +97,8 @@ func (g *GitCheckout) WithReference(ctx context.Context, refName string) (*GitCh
 }
 
 func (g *GitCheckout) LsFiles(ctx context.Context) ([]string, error) {
+	span, ctx := tracer.StartSpanFromContext(ctx, "ls_files")
+	defer span.Finish()
 	g.log.Info(ctx, "asked to list files")
 	defer g.log.Info(ctx, "list done")
 	w, err := g.reference()
@@ -117,6 +124,8 @@ func (g *GitCheckout) LsFiles(ctx context.Context) ([]string, error) {
 }
 
 func (g *GitCheckout) FileContent(ctx context.Context, fileName string) (io.WriterTo, error) {
+	span, ctx := tracer.StartSpanFromContext(ctx, "file_content")
+	defer span.Finish()
 	g.log.Info(ctx, "asked to fetch file", zap.String("file_name", fileName))
 	defer g.log.Info(ctx, "fetch done")
 	w, err := g.reference()
