@@ -27,7 +27,7 @@ func With(ctx context.Context, fields ...zap.Field) context.Context {
 	return context.WithValue(ctx, loggerKey, newFields)
 }
 
-func Fields(ctx context.Context) []zap.Field {
+func fields(ctx context.Context) []zap.Field {
 	existingFieldsVal := ctx.Value(loggerKey)
 	if existingFieldsVal == nil {
 		return nil
@@ -36,7 +36,7 @@ func Fields(ctx context.Context) []zap.Field {
 }
 
 func GetLogger(ctx context.Context, z *zap.Logger) *zap.Logger {
-	return z.With(Fields(ctx)...).With(datadogFields(ctx)...)
+	return z.With(fields(ctx)...).With(datadogFields(ctx)...)
 }
 
 func New(root *zap.Logger) *Logger {
@@ -45,14 +45,18 @@ func New(root *zap.Logger) *Logger {
 	}
 }
 
+type DynamicFields func(ctx context.Context) []zap.Field
+
 type Logger struct {
-	root *zap.Logger
+	root          *zap.Logger
+	dynamicFields []DynamicFields
 }
 
 func (l *Logger) Info(ctx context.Context, msg string, fields ...zap.Field) {
 	if l == nil {
 		return
 	}
+	l.root.WithOptions(zap.Hooks())
 	GetLogger(ctx, l.root).WithOptions(zap.AddCallerSkip(1)).Info(msg, fields...)
 }
 
@@ -84,6 +88,16 @@ func (l *Logger) IfErr(err error) *Logger {
 	return l.With(zap.Error(err))
 }
 
+func (l *Logger) DynamicFields(dynamicFields ...DynamicFields) *Logger {
+	ret := &Logger{
+		root:          l.root,
+		dynamicFields: make([]DynamicFields, 0, len(dynamicFields)+len(l.dynamicFields)),
+	}
+	ret.dynamicFields = append(ret.dynamicFields, l.dynamicFields...)
+	ret.dynamicFields = append(ret.dynamicFields, dynamicFields...)
+	return ret
+}
+
 func (l *Logger) With(fields ...zap.Field) *Logger {
 	if l == nil {
 		return nil
@@ -93,6 +107,7 @@ func (l *Logger) With(fields ...zap.Field) *Logger {
 	}
 }
 
+// TODO: Move this out of this file
 func datadogFields(ctx context.Context) []zap.Field {
 	sp, ok := tracer.SpanFromContext(ctx)
 	if !ok || sp.Context().TraceID() == 0 {

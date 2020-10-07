@@ -123,6 +123,7 @@ func (g *GitCheckout) LsFiles(ctx context.Context) ([]string, error) {
 	return ret, nil
 }
 
+// Will eventually want to cache this
 func (g *GitCheckout) FileContent(ctx context.Context, fileName string) (io.WriterTo, error) {
 	span, ctx := tracer.StartSpanFromContext(ctx, "file_content")
 	defer span.Finish()
