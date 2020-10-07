@@ -76,6 +76,13 @@ func (l *Logger) Error(ctx context.Context, msg string, fields ...zap.Field) {
 	l.logger(ctx).Error(msg, fields...)
 }
 
+func (l *Logger) Debug(ctx context.Context, msg string, fields ...zap.Field) {
+	if l == nil {
+		return
+	}
+	l.logger(ctx).Debug(msg, fields...)
+}
+
 func (l *Logger) Panic(ctx context.Context, msg string, fields ...zap.Field) {
 	if l == nil {
 		return
