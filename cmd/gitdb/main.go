@@ -9,6 +9,9 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
+
+	"github.com/gorilla/mux"
 
 	"github.com/cresta/gitdb/internal/log"
 
@@ -243,21 +246,45 @@ func getRepoKey(repo string) string {
 }
 
 func setupServer(cfg config, z *log.Logger, rootTracer *datadog.Tracing, coHandler *gitdb.CheckoutHandler, githubProvider *github.Provider) *http.Server {
-	mux := rootTracer.CreateRootMux()
+	rootMux := rootTracer.CreateRootMux()
+	rootMux.Use(func(handler http.Handler) http.Handler {
+		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			r := mux.CurrentRoute(request)
+			if r != nil {
+				for k, v := range mux.Vars(request) {
+					request = request.WithContext(log.With(request.Context(), zap.String(fmt.Sprintf("mux.vars.%s", k), v)))
+				}
+				if r.GetName() != "" {
+					request = request.WithContext(log.With(request.Context(), zap.String("mux.name", r.GetName())))
+				}
+			}
+			handler.ServeHTTP(writer, request)
+		})
+	})
+	rootMux.Use(func(handler http.Handler) http.Handler {
+		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			start := time.Now()
+			z.Info(request.Context(), "start request")
+			defer func() {
+				z.Info(request.Context(), "end request", zap.Duration("total_time", time.Since(start)))
+			}()
+			handler.ServeHTTP(writer, request)
+		})
+	})
 
-	mux.Handle("/health", HealthHandler(z.With(zap.String("handler", "health"))))
+	rootMux.Handle("/health", HealthHandler(z.With(zap.String("handler", "health")))).Name("health")
 	if githubProvider != nil {
 		z.Info(context.Background(), "setting up github provider path")
-		githubProvider.SetupMux(mux)
+		githubProvider.SetupMux(rootMux.Router)
 	}
-	coHandler.SetupMux(mux)
-	mux.NotFoundHandler = http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+	coHandler.SetupMux(rootMux.Router)
+	rootMux.NotFoundHandler = http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		z.Info(context.Background(), "not found handler")
 		z.With(zap.String("handler", "not_found"), zap.String("url", req.URL.String())).Warn(context.Background(), "unknown request")
 		http.NotFoundHandler().ServeHTTP(rw, req)
 	})
 	return &http.Server{
-		Handler: mux,
+		Handler: rootMux,
 		Addr:    cfg.ListenAddr,
 	}
 }

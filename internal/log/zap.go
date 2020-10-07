@@ -3,6 +3,8 @@ package log
 import (
 	"context"
 
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
+
 	"go.uber.org/zap"
 )
 
@@ -34,7 +36,7 @@ func Fields(ctx context.Context) []zap.Field {
 }
 
 func GetLogger(ctx context.Context, z *zap.Logger) *zap.Logger {
-	return z.With(Fields(ctx)...)
+	return z.With(Fields(ctx)...).With(datadogFields(ctx)...)
 }
 
 func New(root *zap.Logger) *Logger {
@@ -85,5 +87,16 @@ func (l *Logger) With(fields ...zap.Field) *Logger {
 	}
 	return &Logger{
 		root: l.root.With(fields...),
+	}
+}
+
+func datadogFields(ctx context.Context) []zap.Field {
+	sp, ok := tracer.SpanFromContext(ctx)
+	if !ok {
+		return nil
+	}
+	return []zap.Field{
+		zap.Uint64("dd.trace_id", sp.Context().TraceID()),
+		zap.Uint64("dd.span_id", sp.Context().SpanID()),
 	}
 }
