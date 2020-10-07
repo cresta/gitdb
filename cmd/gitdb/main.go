@@ -174,7 +174,7 @@ func setupGitServer(cfg config, logger *log.Logger) (*gitdb.CheckoutHandler, err
 	logger.Info(context.Background(), "setting up git server")
 	publicKeys, err := getPrivateKeys(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("unable to load private key: %v", err)
+		return nil, fmt.Errorf("unable to load private key: %w", err)
 	}
 	g := gitdb.GitOperator{
 		Log: logger,
@@ -193,11 +193,11 @@ func setupGitServer(cfg config, logger *log.Logger) (*gitdb.CheckoutHandler, err
 		}
 		cloneInto, err := ioutil.TempDir(dataDir, "gitdb_repo_"+sanitizeDir(repo))
 		if err != nil {
-			return nil, fmt.Errorf("unable to make temp dir for %s,%s: %v", dataDir, "gitdb_repo_"+sanitizeDir(repo), err)
+			return nil, fmt.Errorf("unable to make temp dir for %s,%s: %w", dataDir, "gitdb_repo_"+sanitizeDir(repo), err)
 		}
 		co, err := g.Clone(ctx, cloneInto, repo, getPublicKey(publicKeys, idx))
 		if err != nil {
-			return nil, fmt.Errorf("unable to clone repo %s: %v", repo, err)
+			return nil, fmt.Errorf("unable to clone repo %s: %w", repo, err)
 		}
 		gitCheckouts[getRepoKey(repo)] = co
 		logger.Info(context.Background(), "setup checkout", zap.String("repo", repo), zap.String("key", getRepoKey(repo)))
@@ -222,11 +222,11 @@ func getPrivateKeys(cfg config) ([]transport.AuthMethod, error) {
 		}
 		sshKey, err := ioutil.ReadFile(file)
 		if err != nil {
-			return nil, fmt.Errorf("unable to read file %s: %v", file, err)
+			return nil, fmt.Errorf("unable to read file %s: %w", file, err)
 		}
 		publicKey, err := ssh.NewPublicKeys("git", sshKey, cfg.PrivateKeyPasswd)
 		if err != nil {
-			return nil, fmt.Errorf("unable to load public keys: %v", err)
+			return nil, fmt.Errorf("unable to load public keys: %w", err)
 		}
 		ret = append(ret, publicKey)
 	}

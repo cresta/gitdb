@@ -59,7 +59,7 @@ func (g *GitCheckout) Refresh(ctx context.Context) error {
 	if err == nil || errors.Is(err, git.NoErrAlreadyUpToDate) {
 		return nil
 	}
-	return fmt.Errorf("unable to refresh repository: %v", err)
+	return fmt.Errorf("unable to refresh repository: %w", err)
 }
 
 func (g *GitCheckout) AbsPath() string {
@@ -84,7 +84,7 @@ func (g *GitCheckout) RemoteExists(remote string) bool {
 func (g *GitCheckout) WithReference(ctx context.Context, refName string) (*GitCheckout, error) {
 	r, err := g.repo.Reference(plumbing.ReferenceName(refName), true)
 	if err != nil {
-		return nil, fmt.Errorf("unable to resolve ref %s: %v", refName, err)
+		return nil, fmt.Errorf("unable to resolve ref %s: %w", refName, err)
 	}
 	g.log.Info(ctx, "Switched hash", zap.String("hash", r.Hash().String()))
 	return &GitCheckout{
@@ -103,22 +103,22 @@ func (g *GitCheckout) LsFiles(ctx context.Context) ([]string, error) {
 	defer g.log.Info(ctx, "list done")
 	w, err := g.reference()
 	if err != nil {
-		return nil, fmt.Errorf("unable to get repo head: %v", err)
+		return nil, fmt.Errorf("unable to get repo head: %w", err)
 	}
 	t, err := g.repo.CommitObject(w.Hash())
 	if err != nil {
-		return nil, fmt.Errorf("unable to make tree object for hash %s: %v", w.Hash(), err)
+		return nil, fmt.Errorf("unable to make tree object for hash %s: %w", w.Hash(), err)
 	}
 	iter, err := t.Files()
 	if err != nil {
-		return nil, fmt.Errorf("unable to get files for hash: %v", err)
+		return nil, fmt.Errorf("unable to get files for hash: %w", err)
 	}
 	ret := make([]string, 0)
 	if err := iter.ForEach(func(file *object.File) error {
 		ret = append(ret, file.Name)
 		return nil
 	}); err != nil {
-		return nil, fmt.Errorf("uanble to list all files of hash: %v", err)
+		return nil, fmt.Errorf("uanble to list all files of hash: %w", err)
 	}
 	return ret, nil
 }
@@ -130,15 +130,15 @@ func (g *GitCheckout) FileContent(ctx context.Context, fileName string) (io.Writ
 	defer g.log.Info(ctx, "fetch done")
 	w, err := g.reference()
 	if err != nil {
-		return nil, fmt.Errorf("unable to get repo head: %v", err)
+		return nil, fmt.Errorf("unable to get repo head: %w", err)
 	}
 	t, err := g.repo.CommitObject(w.Hash())
 	if err != nil {
-		return nil, fmt.Errorf("unable to make tree object for hash %s: %v", w.Hash(), err)
+		return nil, fmt.Errorf("unable to make tree object for hash %s: %w", w.Hash(), err)
 	}
 	f, err := t.File(fileName)
 	if err != nil {
-		return nil, fmt.Errorf("unable to fetch file %s: %v", fileName, err)
+		return nil, fmt.Errorf("unable to fetch file %s: %w", fileName, err)
 	}
 	return &readerWriterTo{
 		f: f,
@@ -154,7 +154,7 @@ type readerWriterTo struct {
 func (r *readerWriterTo) WriteTo(w io.Writer) (n int64, err error) {
 	rd, err := r.f.Reader()
 	if err != nil {
-		return 0, fmt.Errorf("unable to make reader : %v", err)
+		return 0, fmt.Errorf("unable to make reader : %w", err)
 	}
 	defer func() {
 		r.z.IfErr(rd.Close()).Warn(context.Background(), "unable to close file object")

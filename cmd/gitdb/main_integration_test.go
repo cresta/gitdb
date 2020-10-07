@@ -67,6 +67,11 @@ func TestServer(t *testing.T) {
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 		require.Equal(t, "true\n", requiredRead(t, resp.Body))
 	})
+	t.Run("not_found_file", func(t *testing.T) {
+		resp, err := http.Get(fmt.Sprintf("http://localhost:%d/file/gitdb-reference/master/not_there.txt", sendPort))
+		require.NoError(t, err)
+		require.Equal(t, http.StatusNotFound, resp.StatusCode)
+	})
 	t.Run("not_found", func(t *testing.T) {
 		resp, err := http.Get(fmt.Sprintf("http://localhost:%d/unknown", sendPort))
 		require.NoError(t, err)
