@@ -35,21 +35,21 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
             {{- if .Values.gitdb.dataDirectory }}
-              - name: DATA_DIRECTORY
-                value: {{ .Values.gitdb.dataDirectory | quote }}
+            - name: DATA_DIRECTORY
+              value: {{ .Values.gitdb.dataDirectory | quote }}
             {{- end }}
             {{- if .Values.git }}
             {{- if .Values.git.privateKey }}
-              - name: GITDB_PRIVATE_KEY
-                value: {{ .Values.git.privateKey | quote }}
+            - name: GITDB_PRIVATE_KEY
+              value: {{ .Values.git.privateKey | quote }}
             {{- end }}
             {{- if .Values.git.repos }}
-              - name: GITDB_REPOS
-                value: {{ .Values.git.repos | quote }}
+            - name: GITDB_REPOS
+              value: {{ .Values.git.repos | quote }}
             {{- end }}
             {{- if .Values.git.privateKeyPassword }}
-              - name: GITDB_PRIVATE_KEY_PASSWD
-                value: {{ .Values.git.privateKeyPassword | quote }}
+            - name: GITDB_PRIVATE_KEY_PASSWD
+              value: {{ .Values.git.privateKeyPassword | quote }}
             {{- end }}
             {{- end }}
             {{- if .Values.github }}
