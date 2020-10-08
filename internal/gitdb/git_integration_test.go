@@ -5,10 +5,13 @@ package gitdb
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/go-git/go-git/v5/plumbing/object"
 
 	"github.com/cresta/gitdb/internal/testhelp"
 
@@ -52,6 +55,37 @@ func TestGitgitCheckout_LsFiles(t *testing.T) {
 	f, err := c.LsFiles(context.Background())
 	require.NoError(t, err)
 	require.Greater(t, len(f), 1)
+}
+
+func statsToName(in []FileStat) []string {
+	ret := make([]string, 0, len(in))
+	for _, i := range in {
+		ret = append(ret, i.Name)
+	}
+	return ret
+}
+
+func TestGitgitCheckout_LsDir_subdir(t *testing.T) {
+	c := withRepo(t)
+	defer cleanupRepo(t, c)
+	verifyDir := func(dir string, expected []string) func(t *testing.T) {
+		return func(t *testing.T) {
+			f, err := c.LsDir(context.Background(), dir)
+			require.NoError(t, err)
+			require.Equal(t, expected, statsToName(f))
+		}
+	}
+	verifyError := func(dir string, expected error) func(t *testing.T) {
+		return func(t *testing.T) {
+			_, err := c.LsDir(context.Background(), dir)
+			require.Error(t, err)
+			require.True(t, errors.Is(err, expected))
+		}
+	}
+	t.Run("root", verifyDir("", []string{"README.md", "adir", "on_master.txt"}))
+	t.Run("dir", verifyDir("adir", []string{"file_in_directory.txt", "subdir"}))
+	t.Run("subdir", verifyDir("adir/subdir", []string{"subdir_file.txt", "subdir_file2.txt"}))
+	t.Run("missing_dir", verifyError("notadir", object.ErrDirectoryNotFound))
 }
 
 func TestGitCheckout_Refresh(t *testing.T) {

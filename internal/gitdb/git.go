@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 
 	"github.com/cresta/gitdb/internal/log"
-
 	"github.com/go-git/go-git/v5/plumbing/transport"
 
 	"github.com/go-git/go-git/v5"
@@ -120,6 +120,52 @@ func (g *GitCheckout) LsFiles(ctx context.Context) ([]string, error) {
 	}); err != nil {
 		return nil, fmt.Errorf("uanble to list all files of hash: %w", err)
 	}
+	return ret, nil
+}
+
+type FileStat struct {
+	Name string
+	Mode uint32
+	Hash string
+}
+
+func (g *GitCheckout) LsDir(ctx context.Context, dir string) (retStat []FileStat, retErr error) {
+	span, ctx := tracer.StartSpanFromContext(ctx, "ls_files")
+	defer span.Finish()
+	g.log.Info(ctx, "asked to list files")
+	defer func() {
+		g.log.Info(ctx, "list done", zap.Error(retErr))
+	}()
+	w, err := g.reference()
+	if err != nil {
+		return nil, fmt.Errorf("unable to get repo head: %w", err)
+	}
+	co, err := g.repo.CommitObject(w.Hash())
+	if err != nil {
+		return nil, fmt.Errorf("unable to make commit object for hash %s: %w", w.Hash(), err)
+	}
+	t, err := co.Tree()
+	if err != nil {
+		return nil, fmt.Errorf("unable to make tree object for hash %s: %w", co.Hash, err)
+	}
+	te := t
+	if dir != "" {
+		te, err = t.Tree(dir)
+		if err != nil {
+			return nil, fmt.Errorf("unable to find entry named %s: %w", dir, err)
+		}
+	}
+	ret := make([]FileStat, 0)
+	for _, e := range te.Entries {
+		ret = append(ret, FileStat{
+			Name: e.Name,
+			Mode: uint32(e.Mode),
+			Hash: e.Hash.String(),
+		})
+	}
+	sort.Slice(ret, func(i, j int) bool {
+		return ret[i].Name < ret[j].Name
+	})
 	return ret, nil
 }
 

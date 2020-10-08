@@ -1,9 +1,12 @@
 package gitdb
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -82,6 +85,7 @@ func (h *CheckoutHandler) CheckoutsByRepo() map[string]*GitCheckout {
 
 func (h *CheckoutHandler) SetupMux(mux *mux.Router) {
 	mux.Methods(http.MethodGet).Path("/file/{repo}/{branch}/{path:.*}").Handler(httpserver.BasicHandler(h.getFileHandler, h.Log)).Name("get_file_handler")
+	mux.Methods(http.MethodGet).Path("/ls/{repo}/{branch}/{dir:.*}").Handler(httpserver.BasicHandler(h.lsDirHandler, h.Log)).Name("ls_dir_handler")
 	mux.Methods(http.MethodPost).Path("/refresh/{repo}").Handler(httpserver.BasicHandler(h.refreshRepoHandler, h.Log)).Name("refresh_repo")
 	mux.Methods(http.MethodPost).Path("/refreshall").Handler(httpserver.BasicHandler(h.refreshAllRepoHandler, h.Log)).Name("refresh_all")
 }
@@ -139,6 +143,69 @@ func (h *CheckoutHandler) getFileHandler(req *http.Request) httpserver.CanHTTPWr
 		}
 	}
 	return h.getFile(req.Context(), repo, branch, path, logger)
+}
+
+func (h *CheckoutHandler) lsDirHandler(req *http.Request) httpserver.CanHTTPWrite {
+	vars := mux.Vars(req)
+	repo := vars["repo"]
+	branch := vars["branch"]
+	dir := vars["dir"]
+	logger := h.Log.With(zap.String("repo", repo), zap.String("branch", branch), zap.String("dir", dir))
+	logger.Info(req.Context(), "ls dir handler")
+	if repo == "" || branch == "" {
+		logger.Warn(req.Context(), "unable to find repo/branch")
+		return &httpserver.BasicResponse{
+			Code: http.StatusNotFound,
+			Msg:  strings.NewReader(fmt.Sprintf("One unset{repo: %s, branch: %s}", repo, branch)),
+		}
+	}
+	r, exists := h.Checkouts[repo]
+	if !exists {
+		buf := strings.NewReader(fmt.Sprintf("unable to find repo %s", repo))
+		logger.Info(req.Context(), "invalid repo")
+		return &httpserver.BasicResponse{Code: http.StatusNotFound, Msg: buf}
+	}
+	branchAsRef := plumbing.NewRemoteReferenceName("origin", branch)
+	r, err := r.WithReference(req.Context(), branchAsRef.String())
+	if err != nil {
+		logger.Info(req.Context(), "invalid branch", zap.Error(err))
+		return &httpserver.BasicResponse{
+			Code: http.StatusNotFound,
+			Msg:  strings.NewReader(fmt.Sprintf("unable to find branch %s for repo %s", branch, repo)),
+		}
+	}
+	stat, err := r.LsDir(req.Context(), dir)
+	if err != nil {
+		if errors.Is(err, object.ErrDirectoryNotFound) {
+			return &httpserver.BasicResponse{
+				Code: http.StatusNotFound,
+				Msg:  strings.NewReader(fmt.Sprintf("directory not found %s", dir)),
+			}
+		}
+		logger.Warn(req.Context(), "unable to list path", zap.Error(err))
+		return &httpserver.BasicResponse{
+			Code: http.StatusInternalServerError,
+			Msg:  strings.NewReader(fmt.Sprintf("unable to list path %s: %v", dir, err)),
+		}
+	}
+	return &httpserver.BasicResponse{
+		Code: http.StatusOK,
+		Msg:  FileStatArr(stat),
+		Headers: map[string]string{
+			"Content-Type": "application/json",
+		},
+	}
+}
+
+type FileStatArr []FileStat
+
+func (f FileStatArr) WriteTo(w io.Writer) (int64, error) {
+	var b bytes.Buffer
+	err := json.NewEncoder(&b).Encode(f)
+	if err != nil {
+		return 0, fmt.Errorf("unable to encode body: %w", err)
+	}
+	return io.Copy(w, &b)
 }
 
 func (h *CheckoutHandler) getFile(ctx context.Context, repo string, branch string, path string, logger *log.Logger) httpserver.CanHTTPWrite {
