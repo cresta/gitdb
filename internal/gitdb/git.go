@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
+	"strings"
 
 	"github.com/cresta/gitdb/internal/log"
 
@@ -122,6 +124,7 @@ func (g *GitCheckout) LsFiles(ctx context.Context) ([]string, error) {
 	}
 	return ret, nil
 }
+
 
 // Will eventually want to cache this
 func (g *GitCheckout) FileContent(ctx context.Context, fileName string) (io.WriterTo, error) {

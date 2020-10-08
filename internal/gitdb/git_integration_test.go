@@ -54,6 +54,14 @@ func TestGitgitCheckout_LsFiles(t *testing.T) {
 	require.Greater(t, len(f), 1)
 }
 
+func TestGitgitCheckout_LsDir(t *testing.T) {
+	c := withRepo(t)
+	defer cleanupRepo(t, c)
+	f, err := c.LsDir(context.Background(), "/")
+	require.NoError(t, err)
+	require.Greater(t, len(f), 1)
+}
+
 func TestGitCheckout_Refresh(t *testing.T) {
 	c := withRepo(t)
 	defer cleanupRepo(t, c)
