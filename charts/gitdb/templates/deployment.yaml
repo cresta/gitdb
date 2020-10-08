@@ -34,16 +34,36 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
-          {{- if .Values.git }}
-          {{- if .Values.git.privateKey }}
-            - name: GITDB_PRIVATE_KEY
-              value: {{ .Values.git.privateKey | quote }}
-          {{- end }}
-          {{- if .Values.git.repos }}
-            - name: GITDB_REPOS
-              value: {{ .Values.git.repos | quote }}
-          {{- end }}
-          {{- end }}
+            {{- if .Values.gitdb.dataDirectory }}
+              - name: DATA_DIRECTORY
+                value: {{ .Values.gitdb.dataDirectory | quote }}
+            {{- end }}
+            {{- if .Values.git }}
+            {{- if .Values.git.privateKey }}
+              - name: GITDB_PRIVATE_KEY
+                value: {{ .Values.git.privateKey | quote }}
+            {{- end }}
+            {{- if .Values.git.repos }}
+              - name: GITDB_REPOS
+                value: {{ .Values.git.repos | quote }}
+            {{- end }}
+            {{- if .Values.git.privateKeyPassword }}
+              - name: GITDB_PRIVATE_KEY_PASSWD
+                value: {{ .Values.git.privateKeyPassword | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.github }}
+            {{- if .Values.github.pushToken }}
+            - name: GITHUB_PUSH_TOKEN
+              value: {{ .Values.github.pushToken | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.tracer }}
+            {{- if .Values.tracer.name }}
+            - name: GITDB_TRACER
+              value: {{ .Values.tracer.name | quote }}
+            {{- end }}
+            {{- end }}
             - name: SSH_KNOWN_HOSTS
               value: /etc/ssh/ssh_known_hosts
           ports:

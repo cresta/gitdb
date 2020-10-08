@@ -28,6 +28,16 @@ podAnnotations: {}
 git: {}
 #  privateKey: ""
 #  repos: ""
+#  privateKeyPassword: ""
+
+gitdb:
+  dataDirectory:
+
+github: {}
+# pushToken: ""
+
+tracer: {}
+# name: "datadog"
 
 podSecurityContext:
   fsGroup: 10001
