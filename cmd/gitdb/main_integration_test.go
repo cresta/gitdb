@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -12,6 +13,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+
+	"github.com/cresta/gitdb/internal/gitdb"
 
 	"github.com/cresta/gitdb/internal/testhelp"
 
@@ -69,6 +72,29 @@ func TestServer(t *testing.T) {
 	})
 	t.Run("not_found_file", func(t *testing.T) {
 		resp, err := http.Get(fmt.Sprintf("http://localhost:%d/file/gitdb-reference/master/not_there.txt", sendPort))
+		require.NoError(t, err)
+		require.Equal(t, http.StatusNotFound, resp.StatusCode)
+	})
+	t.Run("ls_dir_root", func(t *testing.T) {
+		resp, err := http.Get(fmt.Sprintf("http://localhost:%d/ls/gitdb-reference/master/", sendPort))
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		var bodyResp []gitdb.FileStat
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&bodyResp))
+		require.Len(t, bodyResp, 3)
+		require.Equal(t, bodyResp[1].Name, "adir")
+	})
+	t.Run("ls_dir_adir", func(t *testing.T) {
+		resp, err := http.Get(fmt.Sprintf("http://localhost:%d/ls/gitdb-reference/master/adir", sendPort))
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		var bodyResp []gitdb.FileStat
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&bodyResp))
+		require.Len(t, bodyResp, 2)
+		require.Equal(t, bodyResp[0].Name, "file_in_directory.txt")
+	})
+	t.Run("ls_dir_missing", func(t *testing.T) {
+		resp, err := http.Get(fmt.Sprintf("http://localhost:%d/ls/gitdb-reference/master/missing", sendPort))
 		require.NoError(t, err)
 		require.Equal(t, http.StatusNotFound, resp.StatusCode)
 	})

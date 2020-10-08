@@ -27,12 +27,16 @@ type CanHTTPWrite interface {
 }
 
 type BasicResponse struct {
-	Code int
-	Msg  io.WriterTo
+	Code    int
+	Msg     io.WriterTo
+	Headers map[string]string
 }
 
 func (g *BasicResponse) HTTPWrite(ctx context.Context, w http.ResponseWriter, l *log.Logger) {
 	w.WriteHeader(g.Code)
+	for k, v := range g.Headers {
+		w.Header().Set(k, v)
+	}
 	if w != nil {
 		_, err := g.Msg.WriteTo(w)
 		l.IfErr(err).Error(ctx, "unable to write final object")
