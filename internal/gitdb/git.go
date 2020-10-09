@@ -88,6 +88,7 @@ func (g *GitCheckout) WithReference(ctx context.Context, refName string) (*GitCh
 	}
 	g.log.Info(ctx, "Switched hash", zap.String("hash", r.Hash().String()))
 	return &GitCheckout{
+		auth:      g.auth,
 		absPath:   g.absPath,
 		remoteURL: g.remoteURL,
 		repo:      g.repo,
