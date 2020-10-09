@@ -137,8 +137,8 @@ func (p *Provider) githubWebhook(req *http.Request) httpserver.CanHTTPWrite {
 		}
 	}
 	eventsToProcessor := map[string]func(*http.Request, interface{}) httpserver.CanHTTPWrite{
-		"PingEvent": p.pingEvent,
-		"PushEvent": p.pushEvent,
+		"ping": p.pingEvent,
+		"push": p.pushEvent,
 	}
 	processor, exists := eventsToProcessor[hookType]
 	if !exists {
