@@ -2,10 +2,11 @@ package github
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
+
+	"github.com/cresta/gitdb/internal/gitdb/tracing"
 
 	"github.com/cresta/gitdb/internal/gitdb"
 	"github.com/cresta/gitdb/internal/httpserver"
@@ -25,14 +26,16 @@ type Provider struct {
 	Token     []byte
 	Logger    *log.Logger
 	Checkouts map[string]GitCheckout
+	Tracing   tracing.Tracing
 }
 
-func Setup(pushToken string, logger *log.Logger, handler *gitdb.CheckoutHandler) *Provider {
+func Setup(pushToken string, logger *log.Logger, handler *gitdb.CheckoutHandler, tracer tracing.Tracing) *Provider {
 	if pushToken == "" {
 		logger.Info(context.Background(), "no github push token.  Not setting up github push notifier")
 		return nil
 	}
 	ret := &Provider{
+		Tracing:   tracer,
 		Token:     []byte(pushToken),
 		Logger:    logger.With(zap.String("class", "github.Provider")),
 		Checkouts: uselessCasting(handler.CheckoutsByRepo()),
@@ -49,26 +52,25 @@ func uselessCasting(in map[string]*gitdb.GitCheckout) map[string]GitCheckout {
 }
 
 func (p *Provider) SetupMux(mux *mux.Router) {
-	mux.Methods(http.MethodPost).Path("/public/github/push_event").Handler(httpserver.BasicHandler(p.pushEvent, p.Logger)).Name("push_event")
+	mux.Methods(http.MethodPost).Path("/public/github/webhook").Handler(httpserver.BasicHandler(p.githubWebhook, p.Logger)).Name("webhook")
 }
 
-// TODO: Also log out the event type (should be in headers)
-func (p *Provider) pushEvent(req *http.Request) httpserver.CanHTTPWrite {
-	p.Logger.Info(req.Context(), "got push event")
-	body, err := github.ValidatePayload(req, p.Token)
-	if err != nil {
-		p.Logger.Warn(req.Context(), "unable to validate payload", zap.Error(err))
-		return &httpserver.BasicResponse{
-			Code: http.StatusForbidden,
-			Msg:  strings.NewReader(fmt.Sprintf("unable to validate payload: %v", err)),
-		}
+func (p *Provider) pingEvent(req *http.Request, _ interface{}) httpserver.CanHTTPWrite {
+	p.Logger.Info(req.Context(), "ping event")
+	return &httpserver.BasicResponse{
+		Code: http.StatusOK,
+		Msg:  strings.NewReader("PONG"),
 	}
-	var event github.PushEvent
-	if err := json.Unmarshal(body, &event); err != nil {
-		p.Logger.Warn(req.Context(), "unable to unpack push event body", zap.Error(err))
+}
+
+func (p *Provider) pushEvent(req *http.Request, evt interface{}) httpserver.CanHTTPWrite {
+	p.Logger.Info(req.Context(), "push event")
+	event, ok := evt.(*github.PushEvent)
+	if !ok {
+		p.Logger.Error(req.Context(), "unable to cast event")
 		return &httpserver.BasicResponse{
-			Code: http.StatusBadRequest,
-			Msg:  strings.NewReader(fmt.Sprintf("unable to unpack push event body: %v", err)),
+			Code: http.StatusInternalServerError,
+			Msg:  strings.NewReader("unable to cast push event"),
 		}
 	}
 	if event.Repo == nil {
@@ -105,4 +107,45 @@ func (p *Provider) pushEvent(req *http.Request) httpserver.CanHTTPWrite {
 		Code: http.StatusOK,
 		Msg:  strings.NewReader(fmt.Sprintf("refreshed repository %s", *event.Repo.SSHURL)),
 	}
+}
+
+// TODO: Also log out the event type (should be in headers)
+func (p *Provider) githubWebhook(req *http.Request) httpserver.CanHTTPWrite {
+	hookType := github.WebHookType(req)
+	if hookType == "" {
+		p.Logger.Warn(req.Context(), "invalid webhook type")
+		return &httpserver.BasicResponse{
+			Code: http.StatusBadRequest,
+			Msg:  strings.NewReader("could not find webhook type"),
+		}
+	}
+	p.Tracing.AttachTag(req.Context(), "github.hook_type", hookType)
+	body, err := github.ValidatePayload(req, p.Token)
+	if err != nil {
+		p.Logger.Warn(req.Context(), "unable to validate payload", zap.Error(err))
+		return &httpserver.BasicResponse{
+			Code: http.StatusForbidden,
+			Msg:  strings.NewReader(fmt.Sprintf("unable to validate payload: %v", err)),
+		}
+	}
+	evt, err := github.ParseWebHook(hookType, body)
+	if err != nil {
+		p.Logger.Warn(req.Context(), "unable to parse webhook", zap.Error(err))
+		return &httpserver.BasicResponse{
+			Code: http.StatusBadRequest,
+			Msg:  strings.NewReader(fmt.Sprintf("cannot parse webhook: %v", err)),
+		}
+	}
+	eventsToProcessor := map[string]func(*http.Request, interface{}) httpserver.CanHTTPWrite{
+		"PingEvent": p.pingEvent,
+		"PushEvent": p.pushEvent,
+	}
+	processor, exists := eventsToProcessor[hookType]
+	if !exists {
+		return &httpserver.BasicResponse{
+			Code: http.StatusNotAcceptable,
+			Msg:  strings.NewReader(fmt.Sprintf("cannot process event: %s", hookType)),
+		}
+	}
+	return processor(req, evt)
 }
