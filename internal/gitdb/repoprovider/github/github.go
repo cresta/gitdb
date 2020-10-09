@@ -29,12 +29,13 @@ type Provider struct {
 	Tracing   tracing.Tracing
 }
 
-func Setup(pushToken string, logger *log.Logger, handler *gitdb.CheckoutHandler) *Provider {
+func Setup(pushToken string, logger *log.Logger, handler *gitdb.CheckoutHandler, tracer tracing.Tracing) *Provider {
 	if pushToken == "" {
 		logger.Info(context.Background(), "no github push token.  Not setting up github push notifier")
 		return nil
 	}
 	ret := &Provider{
+		Tracing:   tracer,
 		Token:     []byte(pushToken),
 		Logger:    logger.With(zap.String("class", "github.Provider")),
 		Checkouts: uselessCasting(handler.CheckoutsByRepo()),
@@ -118,6 +119,7 @@ func (p *Provider) githubWebhook(req *http.Request) httpserver.CanHTTPWrite {
 			Msg:  strings.NewReader("could not find webhook type"),
 		}
 	}
+	p.Tracing.AttachTag(req.Context(), "github.hook_type", hookType)
 	body, err := github.ValidatePayload(req, p.Token)
 	if err != nil {
 		p.Logger.Warn(req.Context(), "unable to validate payload", zap.Error(err))

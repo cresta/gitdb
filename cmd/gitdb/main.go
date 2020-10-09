@@ -110,7 +110,7 @@ func (m *Service) Main() {
 		m.osExit(1)
 		return
 	}
-	githubListener := github.Setup(cfg.GithubPushToken, m.log, co)
+	githubListener := github.Setup(cfg.GithubPushToken, m.log, co, rootTracer)
 	m.server = setupServer(cfg, m.log, rootTracer, co, githubListener)
 
 	ln, err := net.Listen("tcp", m.server.Addr)
