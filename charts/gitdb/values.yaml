@@ -26,6 +26,7 @@ serviceAccount:
 podAnnotations: {}
 
 git: {}
+#  secretName: ""
 #  privateKey: ""
 #  repos: ""
 #  privateKeyPassword: ""
@@ -35,6 +36,9 @@ gitdb:
 
 github: {}
 # pushToken: ""
+
+extraVolumes: []
+extraVolumeMounts: []
 
 tracer: {}
 # name: "datadog"

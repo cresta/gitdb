@@ -29,8 +29,10 @@ spec:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: {{ .Chart.Name }}
+          {{- if .Values.securityContext }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
+          {{- end }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
@@ -78,14 +80,19 @@ spec:
             httpGet:
               path: /health
               port: http
+          {{- if .Values.resources }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-      {{- if (and .Values.git .Values.git.secretName) }}
-          volumeMounts: 
+          {{- end}}
+          volumeMounts:
+          {{- if (and .Values.git .Values.git.secretName) }}
             - mountPath: /etc/gitdb
               name: git-key
               readOnly: true
-      {{- end }}
+          {{- end }}
+{{- if .Values.extraVolumeMounts }}
+{{ toYaml .Values.extraVolumeMounts | indent 12 }}
+{{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -98,10 +105,13 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if .Values.git.secretName }}
       volumes:
+      {{- if .Values.git.secretName }}
       - name: git-key
         secret:
           defaultMode: 256
           secretName: {{ .Values.git.secretName }}
       {{- end }}
+{{- if .Values.extraVolumes }}
+{{ toYaml .Values.extraVolumes | indent 6 }}
+{{- end }}
