@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/cresta/gitdb/internal/gitdb/tracing/datadog"
 	"net"
 	"net/http"
 	"os"
+
+	"github.com/cresta/gitdb/internal/gitdb/tracing/datadog"
 
 	"github.com/cresta/gitdb/internal/gitdb/tracing"
 	"github.com/cresta/gitdb/internal/httpserver"
