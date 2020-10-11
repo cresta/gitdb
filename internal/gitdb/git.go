@@ -59,6 +59,7 @@ type GitCheckout struct {
 
 func (g *GitCheckout) Refresh(ctx context.Context) error {
 	return g.tracing.StartSpanFromContext(ctx, tracing.SpanConfig{OperationName: "refresh"}, func(ctx context.Context) error {
+		g.tracing.AttachTag(ctx, "git.remote_url", g.remoteURL)
 		err := g.repo.FetchContext(ctx, &git.FetchOptions{
 			Auth: g.auth,
 		})
@@ -93,7 +94,7 @@ func (g *GitCheckout) WithReference(ctx context.Context, refName string) (*GitCh
 	if err != nil {
 		return nil, fmt.Errorf("unable to resolve ref %s: %w", refName, err)
 	}
-	g.log.Info(ctx, "Switched hash", zap.String("hash", r.Hash().String()))
+	g.log.Debug(ctx, "Switched hash", zap.String("hash", r.Hash().String()))
 	return &GitCheckout{
 		auth:      g.auth,
 		absPath:   g.absPath,
@@ -108,8 +109,8 @@ func (g *GitCheckout) WithReference(ctx context.Context, refName string) (*GitCh
 func (g *GitCheckout) LsFiles(ctx context.Context) ([]string, error) {
 	var ret []string
 	err := g.tracing.StartSpanFromContext(ctx, tracing.SpanConfig{OperationName: "ls_files"}, func(ctx context.Context) error {
-		g.log.Info(ctx, "asked to list files")
-		defer g.log.Info(ctx, "list done")
+		g.log.Debug(ctx, "asked to list files")
+		defer g.log.Debug(ctx, "list done")
 		w, err := g.reference()
 		if err != nil {
 			return fmt.Errorf("unable to get repo head: %w", err)
@@ -141,9 +142,9 @@ type FileStat struct {
 }
 
 func (g *GitCheckout) LsDir(ctx context.Context, dir string) (retStat []FileStat, retErr error) {
-	g.log.Info(ctx, "asked to list files")
+	g.log.Debug(ctx, "asked to list files")
 	defer func() {
-		g.log.Info(ctx, "list done", zap.Error(retErr))
+		g.log.Debug(ctx, "list done", zap.Error(retErr))
 	}()
 	retErr = g.tracing.StartSpanFromContext(ctx, tracing.SpanConfig{OperationName: "ls_dir"}, func(ctx context.Context) error {
 		w, err := g.reference()
@@ -185,8 +186,8 @@ func (g *GitCheckout) LsDir(ctx context.Context, dir string) (retStat []FileStat
 func (g *GitCheckout) FileContent(ctx context.Context, fileName string) (io.WriterTo, error) {
 	var ret io.WriterTo
 	err := g.tracing.StartSpanFromContext(ctx, tracing.SpanConfig{OperationName: "file_content"}, func(ctx context.Context) error {
-		g.log.Info(ctx, "asked to fetch file", zap.String("file_name", fileName))
-		defer g.log.Info(ctx, "fetch done")
+		g.log.Debug(ctx, "asked to fetch file", zap.String("file_name", fileName))
+		defer g.log.Debug(ctx, "fetch done")
 		w, err := g.reference()
 		if err != nil {
 			return fmt.Errorf("unable to get repo head: %w", err)

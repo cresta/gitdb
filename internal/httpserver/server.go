@@ -49,12 +49,14 @@ func BasicHandler(handler func(request *http.Request) CanHTTPWrite, l *log.Logge
 	})
 }
 
-func LogMiddleware(logger *log.Logger) func(handler http.Handler) http.Handler {
+func LogMiddleware(logger *log.Logger, filterFunc func(req *http.Request) bool) func(handler http.Handler) http.Handler {
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			start := time.Now()
 			defer func() {
-				logger.Info(request.Context(), "end request", zap.Duration("total_time", time.Since(start)))
+				if !filterFunc(request) {
+					logger.Info(request.Context(), "end request", zap.Duration("total_time", time.Since(start)))
+				}
 			}()
 			handler.ServeHTTP(writer, request)
 		})

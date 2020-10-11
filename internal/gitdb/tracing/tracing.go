@@ -71,3 +71,19 @@ func (n Noop) CreateRootMux() (*mux.Router, http.Handler) {
 	ret := mux.NewRouter()
 	return ret, ret
 }
+
+func MuxTagging(t Tracing) func(handler http.Handler) http.Handler {
+	return func(handler http.Handler) http.Handler {
+		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			for k, v := range mux.Vars(request) {
+				t.AttachTag(request.Context(), fmt.Sprintf("mux.vars.%s", k), v)
+			}
+			if r := mux.CurrentRoute(request); r != nil {
+				if r.GetName() != "" {
+					t.AttachTag(request.Context(), "mux.name", r.GetName())
+				}
+			}
+			handler.ServeHTTP(writer, request)
+		})
+	}
+}

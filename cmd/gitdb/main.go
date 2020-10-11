@@ -143,8 +143,9 @@ func (m *Service) Main() {
 func setupServer(cfg config, z *log.Logger, rootTracer tracing.Tracing, coHandler *gitdb.CheckoutHandler, githubProvider *github.Provider) *http.Server {
 	rootMux, rootHandler := rootTracer.CreateRootMux()
 	rootMux.Use(httpserver.MuxMiddleware())
-	rootMux.Use(httpserver.LogMiddleware(z))
-
+	rootMux.Use(httpserver.LogMiddleware(z, func(req *http.Request) bool {
+		return req.URL.Path == "/health"
+	}))
 	rootMux.Handle("/health", httpserver.HealthHandler(z.With(zap.String("handler", "health")), rootTracer)).Name("health")
 	if githubProvider != nil {
 		z.Info(context.Background(), "setting up github provider path")
@@ -152,6 +153,7 @@ func setupServer(cfg config, z *log.Logger, rootTracer tracing.Tracing, coHandle
 	}
 	coHandler.SetupMux(rootMux)
 	rootMux.NotFoundHandler = httpserver.NotFoundHandler(z)
+	rootMux.Use(tracing.MuxTagging(rootTracer))
 	return &http.Server{
 		Handler: rootHandler,
 		Addr:    cfg.ListenAddr,
