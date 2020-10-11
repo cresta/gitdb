@@ -12,6 +12,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/cresta/gitdb/internal/gitdb/tracing"
+
 	"github.com/cresta/gitdb/internal/httpserver"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
@@ -31,14 +33,15 @@ type Config struct {
 	PrivateKeyPasswd string
 }
 
-func NewHandler(logger *log.Logger, cfg Config) (*CheckoutHandler, error) {
+func NewHandler(logger *log.Logger, cfg Config, tracer tracing.Tracing) (*CheckoutHandler, error) {
 	logger.Info(context.Background(), "setting up git server")
 	publicKeys, err := getPrivateKeys(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load private key: %w", err)
 	}
 	g := GitOperator{
-		Log: logger,
+		Log:    logger,
+		Tracer: tracer,
 	}
 	dataDir := cfg.DataDirectory
 	if dataDir == "" {

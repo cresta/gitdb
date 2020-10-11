@@ -9,11 +9,16 @@ import (
 	"github.com/gorilla/mux"
 )
 
+type SpanConfig struct {
+	OperationName string
+}
+
 type Tracing interface {
 	WrapRoundTrip(rt http.RoundTripper) http.RoundTripper
 	AttachTag(ctx context.Context, key string, value interface{})
 	DynamicFields() []log.DynamicFields
 	CreateRootMux() (*mux.Router, http.Handler)
+	StartSpanFromContext(ctx context.Context, cfg SpanConfig, callback func(ctx context.Context) error) error
 }
 
 type Constructor func(config Config) (Tracing, error)
@@ -46,6 +51,10 @@ type Config struct {
 var _ Tracing = Noop{}
 
 type Noop struct{}
+
+func (n Noop) StartSpanFromContext(ctx context.Context, cfg SpanConfig, callback func(ctx context.Context) error) error {
+	return callback(ctx)
+}
 
 func (n Noop) WrapRoundTrip(rt http.RoundTripper) http.RoundTripper {
 	return rt
