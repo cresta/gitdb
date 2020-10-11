@@ -112,6 +112,7 @@ func (l *Logger) With(fields ...zap.Field) *Logger {
 		return nil
 	}
 	return &Logger{
-		root: l.root.With(fields...),
+		root:          l.root.With(fields...),
+		dynamicFields: l.dynamicFields,
 	}
 }

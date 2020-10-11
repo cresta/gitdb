@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cresta/gitdb/internal/gitdb/tracing"
+
 	"github.com/go-git/go-git/v5/plumbing/object"
 
 	"github.com/cresta/gitdb/internal/testhelp"
@@ -41,7 +43,8 @@ func withRepo(t *testing.T) *GitCheckout {
 	require.NotEmpty(t, into)
 	t.Log("Clone into", into)
 	g := GitOperator{
-		Log: testhelp.ZapTestingLogger(t),
+		Log:    testhelp.ZapTestingLogger(t),
+		Tracer: tracing.Noop{},
 	}
 	c, err := g.Clone(ctx, into, repo, nil)
 	require.NoError(t, err)

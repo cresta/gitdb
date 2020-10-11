@@ -7,6 +7,8 @@ import (
 	"io"
 	"sort"
 
+	"github.com/cresta/gitdb/internal/gitdb/tracing"
+
 	"github.com/cresta/gitdb/internal/log"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 
@@ -14,35 +16,40 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"go.uber.org/zap"
-	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
 
 type GitOperator struct {
-	Log *log.Logger
+	Log    *log.Logger
+	Tracer tracing.Tracing
 }
 
 func (g *GitOperator) Clone(ctx context.Context, into string, remoteURL string, auth transport.AuthMethod) (*GitCheckout, error) {
-	span, ctx := tracer.StartSpanFromContext(ctx, "clone")
-	defer span.Finish()
-	repo, err := git.PlainCloneContext(ctx, into, true, &git.CloneOptions{
-		URL:   remoteURL,
-		Depth: 1,
-		Auth:  auth,
+	var ret *GitCheckout
+	err := g.Tracer.StartSpanFromContext(ctx, tracing.SpanConfig{OperationName: "clone"}, func(ctx context.Context) error {
+		repo, err := git.PlainCloneContext(ctx, into, true, &git.CloneOptions{
+			URL:   remoteURL,
+			Depth: 1,
+			Auth:  auth,
+		})
+		if err != nil {
+			return err
+		}
+		ret = &GitCheckout{
+			repo:      repo,
+			absPath:   into,
+			auth:      auth,
+			tracing:   g.Tracer,
+			remoteURL: remoteURL,
+			log:       g.Log.With(zap.String("repo", remoteURL)),
+		}
+		return nil
 	})
-	if err != nil {
-		return nil, err
-	}
-	return &GitCheckout{
-		repo:      repo,
-		absPath:   into,
-		auth:      auth,
-		remoteURL: remoteURL,
-		log:       g.Log.With(zap.String("repo", remoteURL)),
-	}, nil
+	return ret, err
 }
 
 type GitCheckout struct {
 	absPath   string
+	tracing   tracing.Tracing
 	repo      *git.Repository
 	log       *log.Logger
 	ref       *plumbing.Reference
@@ -51,15 +58,15 @@ type GitCheckout struct {
 }
 
 func (g *GitCheckout) Refresh(ctx context.Context) error {
-	span, ctx := tracer.StartSpanFromContext(ctx, "refresh")
-	defer span.Finish()
-	err := g.repo.FetchContext(ctx, &git.FetchOptions{
-		Auth: g.auth,
+	return g.tracing.StartSpanFromContext(ctx, tracing.SpanConfig{OperationName: "refresh"}, func(ctx context.Context) error {
+		err := g.repo.FetchContext(ctx, &git.FetchOptions{
+			Auth: g.auth,
+		})
+		if err == nil || errors.Is(err, git.NoErrAlreadyUpToDate) {
+			return nil
+		}
+		return fmt.Errorf("unable to refresh repository: %w", err)
 	})
-	if err == nil || errors.Is(err, git.NoErrAlreadyUpToDate) {
-		return nil
-	}
-	return fmt.Errorf("unable to refresh repository: %w", err)
 }
 
 func (g *GitCheckout) AbsPath() string {
@@ -92,36 +99,39 @@ func (g *GitCheckout) WithReference(ctx context.Context, refName string) (*GitCh
 		absPath:   g.absPath,
 		remoteURL: g.remoteURL,
 		repo:      g.repo,
+		tracing:   g.tracing,
 		log:       g.log.With(zap.String("ref", refName)),
 		ref:       r,
 	}, nil
 }
 
 func (g *GitCheckout) LsFiles(ctx context.Context) ([]string, error) {
-	span, ctx := tracer.StartSpanFromContext(ctx, "ls_files")
-	defer span.Finish()
-	g.log.Info(ctx, "asked to list files")
-	defer g.log.Info(ctx, "list done")
-	w, err := g.reference()
-	if err != nil {
-		return nil, fmt.Errorf("unable to get repo head: %w", err)
-	}
-	t, err := g.repo.CommitObject(w.Hash())
-	if err != nil {
-		return nil, fmt.Errorf("unable to make tree object for hash %s: %w", w.Hash(), err)
-	}
-	iter, err := t.Files()
-	if err != nil {
-		return nil, fmt.Errorf("unable to get files for hash: %w", err)
-	}
-	ret := make([]string, 0)
-	if err := iter.ForEach(func(file *object.File) error {
-		ret = append(ret, file.Name)
+	var ret []string
+	err := g.tracing.StartSpanFromContext(ctx, tracing.SpanConfig{OperationName: "ls_files"}, func(ctx context.Context) error {
+		g.log.Info(ctx, "asked to list files")
+		defer g.log.Info(ctx, "list done")
+		w, err := g.reference()
+		if err != nil {
+			return fmt.Errorf("unable to get repo head: %w", err)
+		}
+		t, err := g.repo.CommitObject(w.Hash())
+		if err != nil {
+			return fmt.Errorf("unable to make tree object for hash %s: %w", w.Hash(), err)
+		}
+		iter, err := t.Files()
+		if err != nil {
+			return fmt.Errorf("unable to get files for hash: %w", err)
+		}
+		ret = make([]string, 0)
+		if err := iter.ForEach(func(file *object.File) error {
+			ret = append(ret, file.Name)
+			return nil
+		}); err != nil {
+			return fmt.Errorf("uanble to list all files of hash: %w", err)
+		}
 		return nil
-	}); err != nil {
-		return nil, fmt.Errorf("uanble to list all files of hash: %w", err)
-	}
-	return ret, nil
+	})
+	return ret, err
 }
 
 type FileStat struct {
@@ -131,67 +141,71 @@ type FileStat struct {
 }
 
 func (g *GitCheckout) LsDir(ctx context.Context, dir string) (retStat []FileStat, retErr error) {
-	span, ctx := tracer.StartSpanFromContext(ctx, "ls_files")
-	defer span.Finish()
 	g.log.Info(ctx, "asked to list files")
 	defer func() {
 		g.log.Info(ctx, "list done", zap.Error(retErr))
 	}()
-	w, err := g.reference()
-	if err != nil {
-		return nil, fmt.Errorf("unable to get repo head: %w", err)
-	}
-	co, err := g.repo.CommitObject(w.Hash())
-	if err != nil {
-		return nil, fmt.Errorf("unable to make commit object for hash %s: %w", w.Hash(), err)
-	}
-	t, err := co.Tree()
-	if err != nil {
-		return nil, fmt.Errorf("unable to make tree object for hash %s: %w", co.Hash, err)
-	}
-	te := t
-	if dir != "" {
-		te, err = t.Tree(dir)
+	retErr = g.tracing.StartSpanFromContext(ctx, tracing.SpanConfig{OperationName: "ls_dir"}, func(ctx context.Context) error {
+		w, err := g.reference()
 		if err != nil {
-			return nil, fmt.Errorf("unable to find entry named %s: %w", dir, err)
+			return fmt.Errorf("unable to get repo head: %w", err)
 		}
-	}
-	ret := make([]FileStat, 0)
-	for _, e := range te.Entries {
-		ret = append(ret, FileStat{
-			Name: e.Name,
-			Mode: uint32(e.Mode),
-			Hash: e.Hash.String(),
+		co, err := g.repo.CommitObject(w.Hash())
+		if err != nil {
+			return fmt.Errorf("unable to make commit object for hash %s: %w", w.Hash(), err)
+		}
+		t, err := co.Tree()
+		if err != nil {
+			return fmt.Errorf("unable to make tree object for hash %s: %w", co.Hash, err)
+		}
+		te := t
+		if dir != "" {
+			te, err = t.Tree(dir)
+			if err != nil {
+				return fmt.Errorf("unable to find entry named %s: %w", dir, err)
+			}
+		}
+		retStat = make([]FileStat, 0)
+		for _, e := range te.Entries {
+			retStat = append(retStat, FileStat{
+				Name: e.Name,
+				Mode: uint32(e.Mode),
+				Hash: e.Hash.String(),
+			})
+		}
+		sort.Slice(retStat, func(i, j int) bool {
+			return retStat[i].Name < retStat[j].Name
 		})
-	}
-	sort.Slice(ret, func(i, j int) bool {
-		return ret[i].Name < ret[j].Name
+		return nil
 	})
-	return ret, nil
+	return retStat, retErr
 }
 
 // Will eventually want to cache this
 func (g *GitCheckout) FileContent(ctx context.Context, fileName string) (io.WriterTo, error) {
-	span, ctx := tracer.StartSpanFromContext(ctx, "file_content")
-	defer span.Finish()
-	g.log.Info(ctx, "asked to fetch file", zap.String("file_name", fileName))
-	defer g.log.Info(ctx, "fetch done")
-	w, err := g.reference()
-	if err != nil {
-		return nil, fmt.Errorf("unable to get repo head: %w", err)
-	}
-	t, err := g.repo.CommitObject(w.Hash())
-	if err != nil {
-		return nil, fmt.Errorf("unable to make tree object for hash %s: %w", w.Hash(), err)
-	}
-	f, err := t.File(fileName)
-	if err != nil {
-		return nil, fmt.Errorf("unable to fetch file %s: %w", fileName, err)
-	}
-	return &readerWriterTo{
-		f: f,
-		z: g.log.With(zap.String("file_name", fileName)),
-	}, nil
+	var ret io.WriterTo
+	err := g.tracing.StartSpanFromContext(ctx, tracing.SpanConfig{OperationName: "file_content"}, func(ctx context.Context) error {
+		g.log.Info(ctx, "asked to fetch file", zap.String("file_name", fileName))
+		defer g.log.Info(ctx, "fetch done")
+		w, err := g.reference()
+		if err != nil {
+			return fmt.Errorf("unable to get repo head: %w", err)
+		}
+		t, err := g.repo.CommitObject(w.Hash())
+		if err != nil {
+			return fmt.Errorf("unable to make tree object for hash %s: %w", w.Hash(), err)
+		}
+		f, err := t.File(fileName)
+		if err != nil {
+			return fmt.Errorf("unable to fetch file %s: %w", fileName, err)
+		}
+		ret = &readerWriterTo{
+			f: f,
+			z: g.log.With(zap.String("file_name", fileName)),
+		}
+		return nil
+	})
+	return ret, err
 }
 
 type readerWriterTo struct {

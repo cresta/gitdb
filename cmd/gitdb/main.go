@@ -111,7 +111,7 @@ func (m *Service) Main() {
 		Repos:            cfg.Repos,
 		PrivateKey:       cfg.PrivateKey,
 		PrivateKeyPasswd: cfg.PrivateKeyPasswd,
-	})
+	}, rootTracer)
 	if err != nil {
 		m.log.IfErr(err).Panic(context.Background(), "unable to setup git server")
 		m.osExit(1)

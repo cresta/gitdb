@@ -78,7 +78,7 @@ func NewTracer(originalConfig tracing.Config) (tracing.Tracing, error) {
 	}
 
 	startOptions := []tracer.StartOption{
-		tracer.WithRuntimeMetrics(), tracer.WithHTTPRoundTripper(u), tracer.WithDogstatsdAddress("unix://" + cfg.statsFile()), tracer.WithLogger(ddZappedLogger{originalConfig.Log}),
+		tracer.WithRuntimeMetrics(), tracer.WithHTTPRoundTripper(u), tracer.WithLogger(ddZappedLogger{originalConfig.Log}),
 	}
 	if fileExists(cfg.statsFile()) {
 		startOptions = append(startOptions, tracer.WithDogstatsdAddress("unix://"+cfg.statsFile()))
@@ -91,6 +91,18 @@ func NewTracer(originalConfig tracing.Config) (tracing.Tracing, error) {
 var _ tracing.Tracing = &Tracing{}
 
 type Tracing struct {
+}
+
+func (t *Tracing) StartSpanFromContext(ctx context.Context, cfg tracing.SpanConfig, callback func(ctx context.Context) error) (retErr error) {
+	span, ctx := tracer.StartSpanFromContext(ctx, cfg.OperationName)
+	defer func() {
+		var opts []tracer.FinishOption
+		if retErr != nil {
+			opts = append(opts, tracer.WithError(retErr))
+		}
+		span.Finish(opts...)
+	}()
+	return callback(ctx)
 }
 
 func (t *Tracing) AttachTag(ctx context.Context, key string, value interface{}) {
