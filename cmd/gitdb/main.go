@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/cresta/gitdb/internal/gitdb/tracing/datadog"
+
 	"github.com/cresta/gitdb/internal/gitdb/tracing"
 	"github.com/cresta/gitdb/internal/httpserver"
 	"github.com/cresta/gitdb/internal/log"
@@ -66,6 +68,11 @@ type Service struct {
 var instance = Service{
 	osExit: os.Exit,
 	config: getConfig(),
+	tracers: &tracing.Registry{
+		Constructors: map[string]tracing.Constructor{
+			"datadog": datadog.NewTracer,
+		},
+	},
 }
 
 func setupLogging() (*log.Logger, error) {
