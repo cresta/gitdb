@@ -137,7 +137,7 @@ func (h *CheckoutHandler) getFileHandler(req *http.Request) httpserver.CanHTTPWr
 	branch := vars["branch"]
 	path := vars["path"]
 	logger := h.Log.With(zap.String("repo", repo), zap.String("branch", branch), zap.String("path", path))
-	logger.Info(req.Context(), "get file handler")
+	logger.Debug(req.Context(), "get file handler")
 	if repo == "" || branch == "" || path == "" {
 		logger.Warn(req.Context(), "unable to find repo/branch/path")
 		return &httpserver.BasicResponse{
@@ -154,7 +154,7 @@ func (h *CheckoutHandler) lsDirHandler(req *http.Request) httpserver.CanHTTPWrit
 	branch := vars["branch"]
 	dir := vars["dir"]
 	logger := h.Log.With(zap.String("repo", repo), zap.String("branch", branch), zap.String("dir", dir))
-	logger.Info(req.Context(), "ls dir handler")
+	logger.Debug(req.Context(), "ls dir handler")
 	if repo == "" || branch == "" {
 		logger.Warn(req.Context(), "unable to find repo/branch")
 		return &httpserver.BasicResponse{
@@ -165,13 +165,13 @@ func (h *CheckoutHandler) lsDirHandler(req *http.Request) httpserver.CanHTTPWrit
 	r, exists := h.Checkouts[repo]
 	if !exists {
 		buf := strings.NewReader(fmt.Sprintf("unable to find repo %s", repo))
-		logger.Info(req.Context(), "invalid repo")
+		logger.Warn(req.Context(), "invalid repo")
 		return &httpserver.BasicResponse{Code: http.StatusNotFound, Msg: buf}
 	}
 	branchAsRef := plumbing.NewRemoteReferenceName("origin", branch)
 	r, err := r.WithReference(req.Context(), branchAsRef.String())
 	if err != nil {
-		logger.Info(req.Context(), "invalid branch", zap.Error(err))
+		logger.Warn(req.Context(), "invalid branch", zap.Error(err))
 		return &httpserver.BasicResponse{
 			Code: http.StatusNotFound,
 			Msg:  strings.NewReader(fmt.Sprintf("unable to find branch %s for repo %s", branch, repo)),
@@ -215,13 +215,13 @@ func (h *CheckoutHandler) getFile(ctx context.Context, repo string, branch strin
 	r, exists := h.Checkouts[repo]
 	if !exists {
 		buf := strings.NewReader(fmt.Sprintf("unable to find repo %s", repo))
-		logger.Info(ctx, "invalid repo")
+		logger.Warn(ctx, "invalid repo")
 		return &httpserver.BasicResponse{Code: http.StatusNotFound, Msg: buf}
 	}
 	branchAsRef := plumbing.NewRemoteReferenceName("origin", branch)
 	r, err := r.WithReference(ctx, branchAsRef.String())
 	if err != nil {
-		logger.Info(ctx, "invalid branch", zap.Error(err))
+		logger.Warn(ctx, "invalid branch", zap.Error(err))
 		return &httpserver.BasicResponse{
 			Code: http.StatusNotFound,
 			Msg:  strings.NewReader(fmt.Sprintf("unable to find branch %s for repo %s", branch, repo)),
@@ -230,19 +230,19 @@ func (h *CheckoutHandler) getFile(ctx context.Context, repo string, branch strin
 	f, err := r.FileContent(ctx, path)
 	if err != nil {
 		if errors.Is(err, object.ErrFileNotFound) {
-			logger.Info(ctx, "File does not exist", zap.Error(err))
+			logger.Warn(ctx, "File does not exist", zap.Error(err))
 			return &httpserver.BasicResponse{
 				Code: http.StatusNotFound,
 				Msg:  strings.NewReader(fmt.Sprintf("unable to find file %s in branch %s for repo %s", path, branch, repo)),
 			}
 		}
-		logger.Info(ctx, "internal server error", zap.Error(err))
+		logger.Warn(ctx, "internal server error", zap.Error(err))
 		return &httpserver.BasicResponse{
 			Code: http.StatusInternalServerError,
 			Msg:  strings.NewReader(fmt.Sprintf("Unable to fetch file %s: %s", path, err)),
 		}
 	}
-	logger.Info(ctx, "fetch ok")
+	logger.Debug(ctx, "fetch ok")
 	return &httpserver.BasicResponse{
 		Code: http.StatusOK,
 		Msg:  f,
