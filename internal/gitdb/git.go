@@ -33,7 +33,7 @@ func (g *GitOperator) Clone(ctx context.Context, into string, remoteURL string, 
 		repo, err := git.PlainCloneContext(ctx, into, true, &git.CloneOptions{
 			URL:      remoteURL,
 			Depth:    1,
-			Auth:     auth,
+			Auth:     curriedAuth(ctx, auth),
 			Progress: &progress,
 		})
 		if err != nil {
@@ -69,7 +69,7 @@ func (g *GitCheckout) Refresh(ctx context.Context) error {
 		var progress bytes.Buffer
 		g.tracing.AttachTag(ctx, "git.remote_url", g.remoteURL)
 		err := g.repo.FetchContext(ctx, &git.FetchOptions{
-			Auth:     g.auth,
+			Auth:     curriedAuth(ctx, g.auth),
 			Progress: &progress,
 		})
 		if err == nil || errors.Is(err, git.NoErrAlreadyUpToDate) {
@@ -292,7 +292,7 @@ type ContextCurriedAuth struct {
 	transport.AuthMethod
 }
 
-func CurriedAuth(ctx context.Context, auth transport.AuthMethod) *ContextCurriedAuth {
+func curriedAuth(ctx context.Context, auth transport.AuthMethod) *ContextCurriedAuth {
 	return &ContextCurriedAuth{
 		ctx:        ctx,
 		AuthMethod: auth,
