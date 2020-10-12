@@ -8,6 +8,8 @@ import (
 	"io"
 	"sort"
 
+	"github.com/go-git/go-git/v5/plumbing/transport/client"
+
 	"github.com/cresta/gitdb/internal/gitdb/tracing"
 
 	"github.com/cresta/gitdb/internal/log"
@@ -235,3 +237,74 @@ func (r *readerWriterTo) WriteTo(w io.Writer) (n int64, err error) {
 }
 
 var _ io.WriterTo = &readerWriterTo{}
+
+func WrapGitProtocols(t tracing.Tracing) {
+	empty := tracing.Noop{}
+	if t == nil || t == empty {
+		return
+	}
+	for key, protocol := range client.Protocols {
+		if _, ok := client.Protocols[key]; ok {
+			continue
+		}
+		client.Protocols[key] = &LoggedClient{
+			Wrapped: protocol,
+			Tracing: t,
+		}
+	}
+}
+
+type LoggedClient struct {
+	Wrapped transport.Transport
+	Tracing tracing.Tracing
+}
+
+func (l *LoggedClient) NewUploadPackSession(endpoint *transport.Endpoint, authMethod transport.AuthMethod) (transport.UploadPackSession, error) {
+	var ret transport.UploadPackSession
+	err := l.Tracing.StartSpanFromContext(getCurriedAuth(authMethod), tracing.SpanConfig{OperationName: "NewUploadPackSession"}, func(ctx context.Context) error {
+		l.Tracing.AttachTag(ctx, "git.upload_pack.endpoint", endpoint.String())
+		if authMethod != nil {
+			l.Tracing.AttachTag(ctx, "git.auth", authMethod.Name())
+		}
+		var retErr error
+		ret, retErr = l.Wrapped.NewUploadPackSession(endpoint, authMethod)
+		return retErr
+	})
+	return ret, err
+}
+
+func (l *LoggedClient) NewReceivePackSession(endpoint *transport.Endpoint, authMethod transport.AuthMethod) (transport.ReceivePackSession, error) {
+	var ret transport.ReceivePackSession
+	err := l.Tracing.StartSpanFromContext(getCurriedAuth(authMethod), tracing.SpanConfig{OperationName: "NewReceivePackSession"}, func(ctx context.Context) error {
+		l.Tracing.AttachTag(ctx, "git.recv_pack.endpoint", endpoint.String())
+		if authMethod != nil {
+			l.Tracing.AttachTag(ctx, "git.auth", authMethod.Name())
+		}
+		var retErr error
+		ret, retErr = l.Wrapped.NewReceivePackSession(endpoint, authMethod)
+		return retErr
+	})
+	return ret, err
+}
+
+type ContextCurriedAuth struct {
+	ctx context.Context
+	transport.AuthMethod
+}
+
+func CurriedAuth(ctx context.Context, auth transport.AuthMethod) *ContextCurriedAuth {
+	return &ContextCurriedAuth{
+		ctx:        ctx,
+		AuthMethod: auth,
+	}
+}
+
+func getCurriedAuth(a transport.AuthMethod) context.Context {
+	if a == nil {
+		return context.Background()
+	}
+	if obj, ok := a.(*ContextCurriedAuth); ok {
+		return obj.ctx
+	}
+	return context.Background()
+}

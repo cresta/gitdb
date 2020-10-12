@@ -111,6 +111,7 @@ func (m *Service) Main() {
 		m.osExit(1)
 		return
 	}
+	gitdb.WrapGitProtocols(rootTracer)
 	m.log = m.log.DynamicFields(rootTracer.DynamicFields()...)
 
 	co, err := gitdb.NewHandler(m.log, gitdb.Config{
