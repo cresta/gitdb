@@ -39,6 +39,7 @@ func NewHandler(logger *log.Logger, cfg Config, tracer tracing.Tracing) (*Checko
 	if err != nil {
 		return nil, fmt.Errorf("unable to load private key: %w", err)
 	}
+	logger.Info(context.Background(), "public keys loaded", zap.Int("num_keys", len(publicKeys)))
 	g := GitOperator{
 		Log:    logger,
 		Tracer: tracer,
@@ -64,8 +65,9 @@ func NewHandler(logger *log.Logger, cfg Config, tracer tracing.Tracing) (*Checko
 			return nil, fmt.Errorf("unable to clone repo %s: %w", repo, err)
 		}
 		gitCheckouts[getRepoKey(repo)] = co
-		logger.Info(context.Background(), "setup checkout", zap.String("repo", repo), zap.String("key", getRepoKey(repo)))
+		logger.Info(context.Background(), "setup checkout", zap.String("repo", repo), zap.String("key", getRepoKey(repo)), zap.String("into", cloneInto))
 	}
+	logger.Info(context.Background(), "repos loaded", zap.Int("num_keys", len(repos)))
 	ret := &CheckoutHandler{
 		Checkouts: gitCheckouts,
 		Log:       logger.With(zap.String("class", "checkout_handler")),

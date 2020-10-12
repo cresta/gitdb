@@ -1,6 +1,7 @@
 package gitdb
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -26,14 +27,18 @@ type GitOperator struct {
 func (g *GitOperator) Clone(ctx context.Context, into string, remoteURL string, auth transport.AuthMethod) (*GitCheckout, error) {
 	var ret *GitCheckout
 	err := g.Tracer.StartSpanFromContext(ctx, tracing.SpanConfig{OperationName: "clone"}, func(ctx context.Context) error {
+		var progress bytes.Buffer
 		repo, err := git.PlainCloneContext(ctx, into, true, &git.CloneOptions{
-			URL:   remoteURL,
-			Depth: 1,
-			Auth:  auth,
+			URL:      remoteURL,
+			Depth:    1,
+			Auth:     auth,
+			Progress: &progress,
 		})
 		if err != nil {
+			g.Log.Warn(ctx, "unable to clone", zap.Stringer("progress", &progress))
 			return err
 		}
+		g.Log.Debug(ctx, "clone finished", zap.Stringer("progress", &progress))
 		ret = &GitCheckout{
 			repo:      repo,
 			absPath:   into,
@@ -59,13 +64,17 @@ type GitCheckout struct {
 
 func (g *GitCheckout) Refresh(ctx context.Context) error {
 	return g.tracing.StartSpanFromContext(ctx, tracing.SpanConfig{OperationName: "refresh"}, func(ctx context.Context) error {
+		var progress bytes.Buffer
 		g.tracing.AttachTag(ctx, "git.remote_url", g.remoteURL)
 		err := g.repo.FetchContext(ctx, &git.FetchOptions{
-			Auth: g.auth,
+			Auth:     g.auth,
+			Progress: &progress,
 		})
 		if err == nil || errors.Is(err, git.NoErrAlreadyUpToDate) {
+			g.log.Debug(ctx, "fetch finished", zap.Stringer("progress", &progress))
 			return nil
 		}
+		g.log.Warn(ctx, "unable to fetch", zap.Stringer("progress", &progress))
 		return fmt.Errorf("unable to refresh repository: %w", err)
 	})
 }
