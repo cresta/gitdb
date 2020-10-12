@@ -267,7 +267,7 @@ func (l *LoggedClient) NewUploadPackSession(endpoint *transport.Endpoint, authMe
 			l.Tracing.AttachTag(ctx, "git.auth", authMethod.Name())
 		}
 		var retErr error
-		ret, retErr = l.Wrapped.NewUploadPackSession(endpoint, authMethod)
+		ret, retErr = l.Wrapped.NewUploadPackSession(endpoint, unwrapAuth(authMethod))
 		return retErr
 	})
 	return ret, err
@@ -281,7 +281,7 @@ func (l *LoggedClient) NewReceivePackSession(endpoint *transport.Endpoint, authM
 			l.Tracing.AttachTag(ctx, "git.auth", authMethod.Name())
 		}
 		var retErr error
-		ret, retErr = l.Wrapped.NewReceivePackSession(endpoint, authMethod)
+		ret, retErr = l.Wrapped.NewReceivePackSession(endpoint, unwrapAuth(authMethod))
 		return retErr
 	})
 	return ret, err
@@ -297,6 +297,13 @@ func curriedAuth(ctx context.Context, auth transport.AuthMethod) *ContextCurried
 		ctx:        ctx,
 		AuthMethod: auth,
 	}
+}
+
+func unwrapAuth(t transport.AuthMethod) transport.AuthMethod {
+	if root, ok := t.(*ContextCurriedAuth); ok {
+		return root.AuthMethod
+	}
+	return t
 }
 
 func getCurriedAuth(a transport.AuthMethod) context.Context {
