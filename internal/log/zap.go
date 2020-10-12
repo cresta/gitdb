@@ -127,10 +127,6 @@ func (f *FieldLogger) Log(keyvals ...interface{}) {
 	}
 	var fields []zap.Field
 	msg := "log sent"
-	if msgS, ok := keyvals[0].(string); ok {
-		msg = msgS
-	}
-	keyvals = keyvals[1:]
 	for i := 0; i < len(keyvals); i += 2 {
 		if i+1 >= len(keyvals) {
 			continue
@@ -138,7 +134,13 @@ func (f *FieldLogger) Log(keyvals ...interface{}) {
 		kInt := keyvals[i]
 		v := keyvals[i+1]
 		if kAsString, ok := kInt.(string); ok {
-			fields = append(fields, zap.Any(kAsString, v))
+			if kAsString == "msg" {
+				if valAsString, ok := v.(string); ok {
+					msg = valAsString
+				}
+			} else {
+				fields = append(fields, zap.Any(kAsString, v))
+			}
 		}
 	}
 	f.Logger.Info(context.Background(), msg, fields...)
