@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/cresta/gitdb/internal/gitdb/tracing/datadog"
+	"github.com/signalfx/golib/v3/httpdebug"
 
 	"github.com/cresta/gitdb/internal/gitdb/tracing"
 	"github.com/cresta/gitdb/internal/httpserver"
@@ -22,6 +23,7 @@ import (
 type config struct {
 	ListenAddr       string
 	DataDirectory    string
+	DebugListenAddr  string
 	Repos            string
 	PrivateKey       string
 	PrivateKeyPasswd string
@@ -36,17 +38,22 @@ func (c config) WithDefaults() config {
 	if c.DataDirectory == "" {
 		c.DataDirectory = os.TempDir()
 	}
+	if c.DebugListenAddr == "" {
+		c.DebugListenAddr = ":6060"
+	}
 	return c
 }
 
 func getConfig() config {
 	return config{
 		// Defaults to ":8080"
-		ListenAddr:       os.Getenv("LISTEN_ADDR"),
-		DataDirectory:    os.Getenv("DATA_DIRECTORY"),
-		Repos:            os.Getenv("GITDB_REPOS"),
-		PrivateKey:       os.Getenv("GITDB_PRIVATE_KEY"),
-		GithubPushToken:  os.Getenv("GITHUB_PUSH_TOKEN"),
+		ListenAddr:      os.Getenv("LISTEN_ADDR"),
+		DataDirectory:   os.Getenv("DATA_DIRECTORY"),
+		Repos:           os.Getenv("GITDB_REPOS"),
+		PrivateKey:      os.Getenv("GITDB_PRIVATE_KEY"),
+		GithubPushToken: os.Getenv("GITHUB_PUSH_TOKEN"),
+		// Defaults to ":6060"
+		DebugListenAddr:  os.Getenv("GITDB_DEBUG_ADDR"),
 		PrivateKeyPasswd: os.Getenv("GITDB_PRIVATE_KEY_PASSWD"),
 		Tracer:           os.Getenv("GITDB_TRACER"),
 	}.WithDefaults()
@@ -119,6 +126,12 @@ func (m *Service) Main() {
 	}
 	githubListener := github.Setup(cfg.GithubPushToken, m.log, co, rootTracer)
 	m.server = setupServer(cfg, m.log, rootTracer, co, githubListener)
+	shutdownCallback, err := setupDebugServer(m.log, cfg.DebugListenAddr, m)
+	if err != nil {
+		m.log.IfErr(err).Panic(context.Background(), "unable to setup debug server")
+		m.osExit(1)
+		return
+	}
 
 	ln, err := net.Listen("tcp", m.server.Addr)
 	if err != nil {
@@ -135,9 +148,36 @@ func (m *Service) Main() {
 		m.log.IfErr(serveErr).Error(context.Background(), "server existed")
 	}
 	m.log.Info(context.Background(), "Server finished")
+	shutdownCallback()
 	if serveErr != nil {
 		m.osExit(1)
 	}
+}
+
+func setupDebugServer(l *log.Logger, listenAddr string, obj interface{}) (func(), error) {
+	if listenAddr == "" || listenAddr == "-" {
+		return func() {
+		}, nil
+	}
+	ret := httpdebug.New(&httpdebug.Config{
+		Logger:        &log.FieldLogger{Logger: l},
+		ExplorableObj: obj,
+	})
+	ln, err := net.Listen("tcp", listenAddr)
+	if err != nil {
+		return nil, fmt.Errorf("unable to listen to %s: %w", listenAddr, err)
+	}
+	go func() {
+		serveErr := ret.Server.Serve(ln)
+		if serveErr != http.ErrServerClosed {
+			l.IfErr(serveErr).Error(context.Background(), "debug server existed")
+		}
+		l.Info(context.Background(), "debug server finished")
+	}()
+	return func() {
+		err := ln.Close()
+		l.IfErr(err).Warn(context.Background(), "unable to close listening socket for debug server")
+	}, nil
 }
 
 func setupServer(cfg config, z *log.Logger, rootTracer tracing.Tracing, coHandler *gitdb.CheckoutHandler, githubProvider *github.Provider) *http.Server {

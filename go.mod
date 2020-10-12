@@ -10,7 +10,8 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/philhofer/fwd v1.0.0 // indirect
-	github.com/stretchr/testify v1.4.0
+	github.com/signalfx/golib/v3 v3.3.17
+	github.com/stretchr/testify v1.6.1
 	go.uber.org/zap v1.16.0
 	golang.org/x/lint v0.0.0-20200302205851-738671d3881b // indirect
 	golang.org/x/sys v0.0.0-20200803210538-64077c9b5642 // indirect

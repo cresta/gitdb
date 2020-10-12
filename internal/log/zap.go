@@ -116,3 +116,30 @@ func (l *Logger) With(fields ...zap.Field) *Logger {
 		dynamicFields: l.dynamicFields,
 	}
 }
+
+type FieldLogger struct {
+	Logger *Logger
+}
+
+func (f *FieldLogger) Log(keyvals ...interface{}) {
+	if len(keyvals) == 0 {
+		return
+	}
+	var fields []zap.Field
+	msg := "log sent"
+	if msgS, ok := keyvals[0].(string); ok {
+		msg = msgS
+	}
+	keyvals = keyvals[1:]
+	for i := 0; i < len(keyvals); i += 2 {
+		if i+1 >= len(keyvals) {
+			continue
+		}
+		kInt := keyvals[i]
+		v := keyvals[i+1]
+		if kAsString, ok := kInt.(string); ok {
+			fields = append(fields, zap.Any(kAsString, v))
+		}
+	}
+	f.Logger.Info(context.Background(), msg, fields...)
+}
