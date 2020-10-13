@@ -5,10 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
-	ssh2 "golang.org/x/crypto/ssh"
 	"io"
 	"sort"
+
+	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
+	ssh2 "golang.org/x/crypto/ssh"
 
 	"github.com/go-git/go-git/v5/plumbing/transport/client"
 
