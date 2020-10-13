@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
+	ssh2 "golang.org/x/crypto/ssh"
 	"io"
 	"sort"
 
@@ -33,7 +35,7 @@ func (g *GitOperator) Clone(ctx context.Context, into string, remoteURL string, 
 		repo, err := git.PlainCloneContext(ctx, into, true, &git.CloneOptions{
 			URL:      remoteURL,
 			Depth:    1,
-			Auth:     curriedAuth(ctx, auth),
+			Auth:     attachContextToAuth(ctx, auth),
 			Progress: &progress,
 		})
 		if err != nil {
@@ -69,7 +71,7 @@ func (g *GitCheckout) Refresh(ctx context.Context) error {
 		var progress bytes.Buffer
 		g.tracing.AttachTag(ctx, "git.remote_url", g.remoteURL)
 		err := g.repo.FetchContext(ctx, &git.FetchOptions{
-			Auth:     curriedAuth(ctx, g.auth),
+			Auth:     attachContextToAuth(ctx, g.auth),
 			Progress: &progress,
 		})
 		if err == nil || errors.Is(err, git.NoErrAlreadyUpToDate) {
@@ -239,12 +241,8 @@ func (r *readerWriterTo) WriteTo(w io.Writer) (n int64, err error) {
 var _ io.WriterTo = &readerWriterTo{}
 
 func WrapGitProtocols(t tracing.Tracing) {
-	empty := tracing.Noop{}
-	if t == nil || t == empty {
-		return
-	}
 	for key, protocol := range client.Protocols {
-		if _, ok := client.Protocols[key]; ok {
+		if _, ok := client.Protocols[key].(*LoggedClient); ok {
 			continue
 		}
 		client.Protocols[key] = &LoggedClient{
@@ -259,15 +257,18 @@ type LoggedClient struct {
 	Tracing tracing.Tracing
 }
 
+var _ transport.Transport = &LoggedClient{}
+
 func (l *LoggedClient) NewUploadPackSession(endpoint *transport.Endpoint, authMethod transport.AuthMethod) (transport.UploadPackSession, error) {
 	var ret transport.UploadPackSession
-	err := l.Tracing.StartSpanFromContext(getCurriedAuth(authMethod), tracing.SpanConfig{OperationName: "NewUploadPackSession"}, func(ctx context.Context) error {
+	err := l.Tracing.StartSpanFromContext(contextFromAuth(authMethod), tracing.SpanConfig{OperationName: "NewUploadPackSession"}, func(ctx context.Context) error {
+		authMethod = unwrapAuth(authMethod)
 		l.Tracing.AttachTag(ctx, "git.upload_pack.endpoint", endpoint.String())
 		if authMethod != nil {
 			l.Tracing.AttachTag(ctx, "git.auth", authMethod.Name())
 		}
 		var retErr error
-		ret, retErr = l.Wrapped.NewUploadPackSession(endpoint, unwrapAuth(authMethod))
+		ret, retErr = l.Wrapped.NewUploadPackSession(endpoint, authMethod)
 		return retErr
 	})
 	return ret, err
@@ -275,13 +276,14 @@ func (l *LoggedClient) NewUploadPackSession(endpoint *transport.Endpoint, authMe
 
 func (l *LoggedClient) NewReceivePackSession(endpoint *transport.Endpoint, authMethod transport.AuthMethod) (transport.ReceivePackSession, error) {
 	var ret transport.ReceivePackSession
-	err := l.Tracing.StartSpanFromContext(getCurriedAuth(authMethod), tracing.SpanConfig{OperationName: "NewReceivePackSession"}, func(ctx context.Context) error {
+	err := l.Tracing.StartSpanFromContext(contextFromAuth(authMethod), tracing.SpanConfig{OperationName: "NewReceivePackSession"}, func(ctx context.Context) error {
+		authMethod = unwrapAuth(authMethod)
 		l.Tracing.AttachTag(ctx, "git.recv_pack.endpoint", endpoint.String())
 		if authMethod != nil {
 			l.Tracing.AttachTag(ctx, "git.auth", authMethod.Name())
 		}
 		var retErr error
-		ret, retErr = l.Wrapped.NewReceivePackSession(endpoint, unwrapAuth(authMethod))
+		ret, retErr = l.Wrapped.NewReceivePackSession(endpoint, authMethod)
 		return retErr
 	})
 	return ret, err
@@ -292,7 +294,17 @@ type ContextCurriedAuth struct {
 	transport.AuthMethod
 }
 
-func curriedAuth(ctx context.Context, auth transport.AuthMethod) *ContextCurriedAuth {
+func (c *ContextCurriedAuth) ClientConfig() (*ssh2.ClientConfig, error) {
+	if root, ok := c.AuthMethod.(ssh.AuthMethod); ok {
+		return root.ClientConfig()
+	}
+	return nil, errors.New("wrapped auth does not have client config")
+}
+
+// https://github.com/go-git/go-git/issues/185
+var _ ssh.AuthMethod = &ContextCurriedAuth{}
+
+func attachContextToAuth(ctx context.Context, auth transport.AuthMethod) *ContextCurriedAuth {
 	return &ContextCurriedAuth{
 		ctx:        ctx,
 		AuthMethod: auth,
@@ -306,7 +318,7 @@ func unwrapAuth(t transport.AuthMethod) transport.AuthMethod {
 	return t
 }
 
-func getCurriedAuth(a transport.AuthMethod) context.Context {
+func contextFromAuth(a transport.AuthMethod) context.Context {
 	if a == nil {
 		return context.Background()
 	}
