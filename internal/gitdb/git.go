@@ -35,7 +35,6 @@ func (g *GitOperator) Clone(ctx context.Context, into string, remoteURL string, 
 		var progress bytes.Buffer
 		repo, err := git.PlainCloneContext(ctx, into, true, &git.CloneOptions{
 			URL:      remoteURL,
-			Depth:    1,
 			Auth:     attachContextToAuth(ctx, auth),
 			Progress: &progress,
 		})
