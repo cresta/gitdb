@@ -12,16 +12,15 @@ import (
 	"os"
 	"strings"
 
+	jwtmiddleware "github.com/auth0/go-jwt-middleware"
 	"github.com/cresta/gitdb/internal/gitdb/tracing"
-
 	"github.com/cresta/gitdb/internal/httpserver"
-	"github.com/go-git/go-git/v5/plumbing/transport"
-	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
-
 	"github.com/cresta/gitdb/internal/log"
-
+	"github.com/dgrijalva/jwt-go"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-git/go-git/v5/plumbing/transport"
+	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 )
@@ -88,11 +87,30 @@ func (h *CheckoutHandler) CheckoutsByRepo() map[string]*GitCheckout {
 	return ret
 }
 
-func (h *CheckoutHandler) SetupMux(mux *mux.Router) {
+func (h *CheckoutHandler) SetupMux(mux *mux.Router, keyFunc jwt.Keyfunc) {
 	mux.Methods(http.MethodGet).Path("/file/{repo}/{branch}/{path:.*}").Handler(httpserver.BasicHandler(h.getFileHandler, h.Log)).Name("get_file_handler")
 	mux.Methods(http.MethodGet).Path("/ls/{repo}/{branch}/{dir:.*}").Handler(httpserver.BasicHandler(h.lsDirHandler, h.Log)).Name("ls_dir_handler")
 	mux.Methods(http.MethodPost).Path("/refresh/{repo}").Handler(httpserver.BasicHandler(h.refreshRepoHandler, h.Log)).Name("refresh_repo")
 	mux.Methods(http.MethodPost).Path("/refreshall").Handler(httpserver.BasicHandler(h.refreshAllRepoHandler, h.Log)).Name("refresh_all")
+	if keyFunc == nil {
+		return
+	}
+	middleware := jwtmiddleware.New(jwtmiddleware.Options{
+		ValidationKeyGetter: keyFunc,
+		SigningMethod:       jwt.SigningMethodRS256,
+		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err string) {
+			resp := httpserver.BasicResponse{
+				Code:    http.StatusUnauthorized,
+				Msg:     strings.NewReader(err),
+				Headers: nil,
+			}
+			h.Log.Warn(r.Context(), "error during JWT", zap.String("err_string", err))
+			resp.HTTPWrite(r.Context(), w, h.Log)
+		},
+	})
+
+	mux.Methods(http.MethodGet).Path("/public/file/{repo}/{branch}/{path:.*}").Handler(middleware.Handler(httpserver.BasicHandler(h.getFileHandler, h.Log))).Name("public_get_file_handler")
+	mux.Methods(http.MethodGet).Path("/public/ls/{repo}/{branch}/{dir:.*}").Handler(middleware.Handler(httpserver.BasicHandler(h.lsDirHandler, h.Log))).Name("public_ls_dir_handler")
 }
 
 func (h *CheckoutHandler) refreshAllRepoHandler(req *http.Request) httpserver.CanHTTPWrite {

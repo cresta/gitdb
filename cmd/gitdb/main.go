@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/dgrijalva/jwt-go"
+
 	"github.com/cresta/gitdb/internal/gitdb/tracing/datadog"
 	"github.com/signalfx/golib/v3/httpdebug"
 
@@ -29,6 +31,7 @@ type config struct {
 	PrivateKeyPasswd string
 	GithubPushToken  string
 	Tracer           string
+	JWTSecret        string
 }
 
 func (c config) WithDefaults() config {
@@ -56,6 +59,7 @@ func getConfig() config {
 		DebugListenAddr:  os.Getenv("GITDB_DEBUG_ADDR"),
 		PrivateKeyPasswd: os.Getenv("GITDB_PRIVATE_KEY_PASSWD"),
 		Tracer:           os.Getenv("GITDB_TRACER"),
+		JWTSecret:        os.Getenv("GITDB_JWT_SECRET"),
 	}.WithDefaults()
 }
 
@@ -192,7 +196,13 @@ func setupServer(cfg config, z *log.Logger, rootTracer tracing.Tracing, coHandle
 		z.Info(context.Background(), "setting up github provider path")
 		githubProvider.SetupMux(rootMux)
 	}
-	coHandler.SetupMux(rootMux)
+	var keyFunc jwt.Keyfunc
+	if cfg.JWTSecret != "" {
+		keyFunc = func(token *jwt.Token) (interface{}, error) {
+			return []byte(cfg.JWTSecret), nil
+		}
+	}
+	coHandler.SetupMux(rootMux, keyFunc)
 	rootMux.NotFoundHandler = httpserver.NotFoundHandler(z)
 	rootMux.Use(tracing.MuxTagging(rootTracer))
 	return &http.Server{

@@ -57,7 +57,7 @@ function build() {
 
 function reformat() {
   gofmt -s -w ./..
-	find . -iname '*.go' -print0 | xargs -0 goimports -w
+  find . -iname '*.go' -print0 | xargs -0 goimports -w
 }
 
 function docker_tags() {
