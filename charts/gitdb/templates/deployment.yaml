@@ -44,7 +44,7 @@ spec:
             - name: GITDB_JWT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{- .Values.gitdb.jwtSecret }}
+                  name: {{ .Values.gitdb.jwtSecret }}
                   key: GITDB_JWT_SECRET
             {{- end }}
             {{- if .Values.git }}
