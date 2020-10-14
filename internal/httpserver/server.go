@@ -93,7 +93,7 @@ func NotFoundHandler(logger *log.Logger) http.Handler {
 type JWTSignIn struct {
 	Logger        *log.Logger
 	Auth          func(username string, password string) (bool, error)
-	SigningString func(username string) string
+	SigningString func(username string) []byte
 }
 
 func (j *JWTSignIn) ServeHTTP(writer http.ResponseWriter, request *http.Request) {

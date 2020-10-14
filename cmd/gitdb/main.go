@@ -213,8 +213,8 @@ func setupServer(cfg config, z *log.Logger, rootTracer tracing.Tracing, coHandle
 			Auth: func(username string, password string) (bool, error) {
 				return username == cfg.JWTSignInUsername && password == cfg.JWTSecret, nil
 			},
-			SigningString: func(username string) string {
-				return cfg.JWTSecret
+			SigningString: func(username string) []byte {
+				return []byte(cfg.JWTSecret)
 			},
 		}
 		rootMux.Handle("/signin", signIn).Name("signin")
