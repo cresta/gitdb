@@ -201,6 +201,9 @@ func setupServer(cfg config, z *log.Logger, rootTracer tracing.Tracing, coHandle
 		keyFunc = func(token *jwt.Token) (interface{}, error) {
 			return []byte(cfg.JWTSecret), nil
 		}
+		z.Info(context.Background(), "set up JWT secret")
+	} else {
+		z.Info(context.Background(), "skipping JWT secret setup")
 	}
 	coHandler.SetupMux(rootMux, keyFunc)
 	rootMux.NotFoundHandler = httpserver.NotFoundHandler(z)
