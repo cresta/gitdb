@@ -12,19 +12,15 @@ import (
 	"os"
 	"strings"
 
-	"github.com/dgrijalva/jwt-go"
-
-	"github.com/cresta/gitdb/internal/gitdb/tracing"
-
 	"github.com/auth0/go-jwt-middleware"
+	"github.com/cresta/gitdb/internal/gitdb/tracing"
 	"github.com/cresta/gitdb/internal/httpserver"
-	"github.com/go-git/go-git/v5/plumbing/transport"
-	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
-
 	"github.com/cresta/gitdb/internal/log"
-
+	"github.com/dgrijalva/jwt-go"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-git/go-git/v5/plumbing/transport"
+	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 )
