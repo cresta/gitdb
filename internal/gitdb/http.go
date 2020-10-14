@@ -12,7 +12,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/auth0/go-jwt-middleware"
+	jwtmiddleware "github.com/auth0/go-jwt-middleware"
 	"github.com/cresta/gitdb/internal/gitdb/tracing"
 	"github.com/cresta/gitdb/internal/httpserver"
 	"github.com/cresta/gitdb/internal/log"
