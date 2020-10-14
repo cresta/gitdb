@@ -23,15 +23,16 @@ import (
 )
 
 type config struct {
-	ListenAddr       string
-	DataDirectory    string
-	DebugListenAddr  string
-	Repos            string
-	PrivateKey       string
-	PrivateKeyPasswd string
-	GithubPushToken  string
-	Tracer           string
-	JWTSecret        string
+	ListenAddr        string
+	DataDirectory     string
+	DebugListenAddr   string
+	Repos             string
+	PrivateKey        string
+	PrivateKeyPasswd  string
+	GithubPushToken   string
+	Tracer            string
+	JWTSecret         string
+	JWTSignInUsername string
 }
 
 func (c config) WithDefaults() config {
@@ -56,10 +57,11 @@ func getConfig() config {
 		PrivateKey:      os.Getenv("GITDB_PRIVATE_KEY"),
 		GithubPushToken: os.Getenv("GITHUB_PUSH_TOKEN"),
 		// Defaults to ":6060"
-		DebugListenAddr:  os.Getenv("GITDB_DEBUG_ADDR"),
-		PrivateKeyPasswd: os.Getenv("GITDB_PRIVATE_KEY_PASSWD"),
-		Tracer:           os.Getenv("GITDB_TRACER"),
-		JWTSecret:        os.Getenv("GITDB_JWT_SECRET"),
+		DebugListenAddr:   os.Getenv("GITDB_DEBUG_ADDR"),
+		PrivateKeyPasswd:  os.Getenv("GITDB_PRIVATE_KEY_PASSWD"),
+		Tracer:            os.Getenv("GITDB_TRACER"),
+		JWTSecret:         os.Getenv("GITDB_JWT_SECRET"),
+		JWTSignInUsername: os.Getenv("GITDB_JWT_SIGNIN_USERNAME"),
 	}.WithDefaults()
 }
 
@@ -204,6 +206,18 @@ func setupServer(cfg config, z *log.Logger, rootTracer tracing.Tracing, coHandle
 		z.Info(context.Background(), "set up JWT secret")
 	} else {
 		z.Info(context.Background(), "skipping JWT secret setup")
+	}
+	if cfg.JWTSignInUsername != "" && cfg.JWTSecret != "" {
+		signIn := &httpserver.JWTSignIn{
+			Logger: z.With(zap.String("handler", "jwt_sign_in")),
+			Auth: func(username string, password string) (bool, error) {
+				return username == cfg.JWTSignInUsername && password == cfg.JWTSecret, nil
+			},
+			SigningString: func(username string) string {
+				return cfg.JWTSecret
+			},
+		}
+		rootMux.Handle("/signin", signIn).Name("signin")
 	}
 	coHandler.SetupMux(rootMux, keyFunc)
 	rootMux.NotFoundHandler = httpserver.NotFoundHandler(z)

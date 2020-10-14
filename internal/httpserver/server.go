@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
+
+	"github.com/dgrijalva/jwt-go"
 
 	"github.com/cresta/gitdb/internal/gitdb/tracing"
 	"github.com/cresta/gitdb/internal/log"
@@ -86,3 +89,65 @@ func NotFoundHandler(logger *log.Logger) http.Handler {
 		http.NotFoundHandler().ServeHTTP(rw, req)
 	})
 }
+
+type JWTSignIn struct {
+	Logger        *log.Logger
+	Auth          func(username string, password string) (bool, error)
+	SigningString func(username string) string
+}
+
+func (J *JWTSignIn) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	user, pass, ok := request.BasicAuth()
+	if !ok {
+		resp := BasicResponse{
+			Code: http.StatusForbidden,
+			Msg:  strings.NewReader("no basic auth information"),
+		}
+		resp.HTTPWrite(request.Context(), writer, J.Logger)
+		return
+	}
+	ok, err := J.Auth(user, pass)
+	if err != nil {
+		resp := BasicResponse{
+			Code: http.StatusInternalServerError,
+			Msg:  strings.NewReader("unable to verify auth"),
+		}
+		J.Logger.IfErr(err).Warn(request.Context(), "unable to auth")
+		resp.HTTPWrite(request.Context(), writer, J.Logger)
+		return
+	}
+	if !ok {
+		resp := BasicResponse{
+			Code: http.StatusForbidden,
+			Msg:  strings.NewReader("incorrect credentials"),
+		}
+		J.Logger.Info(request.Context(), "bad auth", zap.String("user", user))
+		resp.HTTPWrite(request.Context(), writer, J.Logger)
+		return
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, &jwt.StandardClaims{
+		Audience:  "",
+		ExpiresAt: time.Now().Add(time.Hour).Unix(),
+		IssuedAt:  time.Now().Unix(),
+		Issuer:    "gitdb",
+		NotBefore: time.Now().Add(-time.Minute).Unix(),
+	})
+	s, err := token.SignedString(J.SigningString(user))
+	if err != nil {
+		resp := BasicResponse{
+			Code: http.StatusInternalServerError,
+			Msg:  strings.NewReader("unable to sign token"),
+		}
+		J.Logger.IfErr(err).Warn(request.Context(), "unable to sign token")
+		resp.HTTPWrite(request.Context(), writer, J.Logger)
+		return
+	}
+	resp := BasicResponse{
+		Code: http.StatusOK,
+		Msg:  strings.NewReader(s),
+	}
+	J.Logger.Info(request.Context(), "Signed token", zap.String("user", user))
+	resp.HTTPWrite(request.Context(), writer, J.Logger)
+}
+
+var _ http.Handler = &JWTSignIn{}
