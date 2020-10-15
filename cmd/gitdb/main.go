@@ -258,7 +258,7 @@ func setupJWTSigning(ctx context.Context, cfg config, log *log.Logger, m *mux.Ro
 			return pKey
 		},
 	}
-	m.Handle("/signin", signIn).Name("signin")
+	m.Handle("/signin", signIn).Methods(http.MethodPost).Name("signin")
 	return nil
 }
 
