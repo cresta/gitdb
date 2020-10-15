@@ -6,12 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	jwtmiddleware "github.com/auth0/go-jwt-middleware"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
+
+	jwtmiddleware "github.com/auth0/go-jwt-middleware"
 
 	"github.com/cresta/gitdb/internal/gitdb/tracing"
 	"github.com/cresta/gitdb/internal/httpserver"

@@ -3,12 +3,13 @@ package httpserver
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"github.com/cresta/gitdb/internal/testhelp"
-	"github.com/dgrijalva/jwt-go"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/cresta/gitdb/internal/testhelp"
+	"github.com/dgrijalva/jwt-go"
+	"github.com/stretchr/testify/require"
 )
 
 func TestJWTSignIn(t *testing.T) {

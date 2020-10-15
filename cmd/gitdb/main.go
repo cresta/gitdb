@@ -4,11 +4,12 @@ import (
 	"context"
 	"crypto/rsa"
 	"fmt"
-	"github.com/gorilla/mux"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
+
+	"github.com/gorilla/mux"
 
 	"github.com/dgrijalva/jwt-go"
 
@@ -26,19 +27,19 @@ import (
 )
 
 type config struct {
-	ListenAddr        string
-	DataDirectory     string
-	DebugListenAddr   string
-	Repos             string
-	PrivateKey        string
-	PrivateKeyPasswd  string
-	GithubPushToken   string
-	Tracer            string
-	JWTPrivateKey     string
+	ListenAddr          string
+	DataDirectory       string
+	DebugListenAddr     string
+	Repos               string
+	PrivateKey          string
+	PrivateKeyPasswd    string
+	GithubPushToken     string
+	Tracer              string
+	JWTPrivateKey       string
 	JWTPrivateKeyPasswd string
-	JWTPublicKey      string
-	JWTSignInUsername string
-	JWTSignInPassword string
+	JWTPublicKey        string
+	JWTSignInUsername   string
+	JWTSignInPassword   string
 }
 
 func (c config) WithDefaults() config {
@@ -63,15 +64,15 @@ func getConfig() config {
 		PrivateKey:      os.Getenv("GITDB_PRIVATE_KEY"),
 		GithubPushToken: os.Getenv("GITHUB_PUSH_TOKEN"),
 		// Defaults to ":6060"
-		DebugListenAddr:   os.Getenv("GITDB_DEBUG_ADDR"),
-		PrivateKeyPasswd:  os.Getenv("GITDB_PRIVATE_KEY_PASSWD"),
-		Tracer:            os.Getenv("GITDB_TRACER"),
+		DebugListenAddr:  os.Getenv("GITDB_DEBUG_ADDR"),
+		PrivateKeyPasswd: os.Getenv("GITDB_PRIVATE_KEY_PASSWD"),
+		Tracer:           os.Getenv("GITDB_TRACER"),
 
-		JWTPrivateKey:     os.Getenv("GITDB_JWT_PRIVATE_KEY"),
+		JWTPrivateKey:       os.Getenv("GITDB_JWT_PRIVATE_KEY"),
 		JWTPrivateKeyPasswd: os.Getenv("GITDB_JWT_PRIVATE_KEY_PASSWD"),
-		JWTPublicKey:      os.Getenv("GITDB_JWT_PUBLIC_KEY"),
-		JWTSignInUsername: os.Getenv("GITDB_JWT_SIGNIN_USERNAME"),
-		JWTSignInPassword: os.Getenv("GITDB_JWT_SIGNIN_PASSWORD"),
+		JWTPublicKey:        os.Getenv("GITDB_JWT_PUBLIC_KEY"),
+		JWTSignInUsername:   os.Getenv("GITDB_JWT_SIGNIN_USERNAME"),
+		JWTSignInPassword:   os.Getenv("GITDB_JWT_SIGNIN_PASSWORD"),
 	}.WithDefaults()
 }
 
