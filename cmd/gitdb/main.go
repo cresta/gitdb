@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/rsa"
 	"fmt"
+	"github.com/gorilla/mux"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -31,8 +34,11 @@ type config struct {
 	PrivateKeyPasswd  string
 	GithubPushToken   string
 	Tracer            string
-	JWTSecret         string
+	JWTPrivateKey     string
+	JWTPrivateKeyPasswd string
+	JWTPublicKey      string
 	JWTSignInUsername string
+	JWTSignInPassword string
 }
 
 func (c config) WithDefaults() config {
@@ -60,8 +66,12 @@ func getConfig() config {
 		DebugListenAddr:   os.Getenv("GITDB_DEBUG_ADDR"),
 		PrivateKeyPasswd:  os.Getenv("GITDB_PRIVATE_KEY_PASSWD"),
 		Tracer:            os.Getenv("GITDB_TRACER"),
-		JWTSecret:         os.Getenv("GITDB_JWT_SECRET"),
+
+		JWTPrivateKey:     os.Getenv("GITDB_JWT_PRIVATE_KEY"),
+		JWTPrivateKeyPasswd: os.Getenv("GITDB_JWT_PRIVATE_KEY_PASSWD"),
+		JWTPublicKey:      os.Getenv("GITDB_JWT_PUBLIC_KEY"),
 		JWTSignInUsername: os.Getenv("GITDB_JWT_SIGNIN_USERNAME"),
+		JWTSignInPassword: os.Getenv("GITDB_JWT_SIGNIN_PASSWORD"),
 	}.WithDefaults()
 }
 
@@ -187,6 +197,66 @@ func setupDebugServer(l *log.Logger, listenAddr string, obj interface{}) (func()
 	}, nil
 }
 
+func setupJWT(cfg config, m *mux.Router, h *gitdb.CheckoutHandler) error {
+	fileContent, err := ioutil.ReadFile(cfg.JWTPublicKey)
+	if err != nil {
+		return fmt.Errorf("unable to read jwt file %s: %w", cfg.JWTPublicKey, err)
+	}
+	parsedPublicKey, err := jwt.ParseRSAPublicKeyFromPEM(fileContent)
+	if err != nil {
+		return fmt.Errorf("unable to parse public key in file %s: %w", cfg.JWTPublicKey, err)
+	}
+	keyFunc := func(token *jwt.Token) (interface{}, error) {
+		return parsedPublicKey, nil
+	}
+	h.SetupPublicJWTHandler(m, keyFunc)
+	return nil
+}
+
+func setupJWTSigning(ctx context.Context, cfg config, log *log.Logger, m *mux.Router) error {
+	if cfg.JWTSignInUsername == "" {
+		log.Info(ctx, "no username set, skipping JWT signing step")
+		return nil
+	}
+	if cfg.JWTSignInPassword == "" {
+		log.Info(ctx, "no password set, skipping JWT signing step")
+		return nil
+	}
+	if cfg.JWTPrivateKey == "" {
+		log.Info(ctx, "no private key set.  Skipping JWT signing step")
+		return nil
+	}
+	fileContent, err := ioutil.ReadFile(cfg.JWTPrivateKey)
+	if err != nil {
+		return fmt.Errorf("unable to read private key file %s: %w", cfg.JWTPrivateKey, err)
+	}
+	var pKey *rsa.PrivateKey
+	var parseErr error
+	if cfg.JWTPrivateKeyPasswd == "" {
+		log.Info(ctx, "JWT private key password not set")
+		pKey, parseErr = jwt.ParseRSAPrivateKeyFromPEM(fileContent)
+		if parseErr != nil {
+			return fmt.Errorf("unable to parse private key from PEM: %w", err)
+		}
+	} else {
+		pKey, parseErr = jwt.ParseRSAPrivateKeyFromPEMWithPassword(fileContent, cfg.JWTPrivateKeyPasswd)
+		if parseErr != nil {
+			return fmt.Errorf("unable to parse private key from PEM: %w", err)
+		}
+	}
+	signIn := &httpserver.JWTSignIn{
+		Logger: log.With(zap.String("handler", "jwt_sign_in")),
+		Auth: func(username string, password string) (bool, error) {
+			return username == cfg.JWTSignInUsername && password == cfg.JWTSignInPassword, nil
+		},
+		SigningString: func(username string) *rsa.PrivateKey {
+			return pKey
+		},
+	}
+	m.Handle("/signin", signIn).Name("signin")
+	return nil
+}
+
 func setupServer(cfg config, z *log.Logger, rootTracer tracing.Tracing, coHandler *gitdb.CheckoutHandler, githubProvider *github.Provider) *http.Server {
 	rootMux, rootHandler := rootTracer.CreateRootMux()
 	rootMux.Use(httpserver.MuxMiddleware())
@@ -198,28 +268,8 @@ func setupServer(cfg config, z *log.Logger, rootTracer tracing.Tracing, coHandle
 		z.Info(context.Background(), "setting up github provider path")
 		githubProvider.SetupMux(rootMux)
 	}
-	var keyFunc jwt.Keyfunc
-	if cfg.JWTSecret != "" {
-		keyFunc = func(token *jwt.Token) (interface{}, error) {
-			return []byte(cfg.JWTSecret), nil
-		}
-		z.Info(context.Background(), "set up JWT secret")
-	} else {
-		z.Info(context.Background(), "skipping JWT secret setup")
-	}
-	if cfg.JWTSignInUsername != "" && cfg.JWTSecret != "" {
-		signIn := &httpserver.JWTSignIn{
-			Logger: z.With(zap.String("handler", "jwt_sign_in")),
-			Auth: func(username string, password string) (bool, error) {
-				return username == cfg.JWTSignInUsername && password == cfg.JWTSecret, nil
-			},
-			SigningString: func(username string) []byte {
-				return []byte(cfg.JWTSecret)
-			},
-		}
-		rootMux.Handle("/signin", signIn).Name("signin")
-	}
-	coHandler.SetupMux(rootMux, keyFunc)
+	z.IfErr(setupJWT(cfg, rootMux, coHandler)).Panic(context.Background(), "unable to public JWT endpoint")
+	z.IfErr(setupJWTSigning(context.Background(), cfg, z, rootMux)).Panic(context.Background(), "unable to setup JWT signing")
 	rootMux.NotFoundHandler = httpserver.NotFoundHandler(z)
 	rootMux.Use(tracing.MuxTagging(rootTracer))
 	return &http.Server{

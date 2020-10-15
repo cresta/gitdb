@@ -35,19 +35,30 @@ spec:
           {{- end }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.gitdb.envSecrets }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.gitdb.envSecrets }}
+          {{- end }}
           env:
             {{- if .Values.gitdb.dataDirectory }}
             - name: DATA_DIRECTORY
               value: {{ .Values.gitdb.dataDirectory | quote }}
             {{- end }}
-            {{- if .Values.gitdb.jwtSecret }}
-            - name: GITDB_JWT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.gitdb.jwtSecret }}
-                  key: GITDB_JWT_SECRET
+# JWT
+            {{- if .Values.jwt.privateKey }}
+            - name: GITDB_JWT_PRIVATE_KEY
+              value: {{ .Values.jwt.privateKey | quote }}
             {{- end }}
-            {{- if .Values.git }}
+            {{- if .Values.jwt.publicKey }}
+            - name: GITDB_JWT_PUBLIC_KEY
+              value: {{ .Values.jwt.publicKey | quote }}
+            {{- end }}
+            {{- if .Values.jwt.signInUsername }}
+            - name: GITDB_JWT_SIGNIN_USERNAME
+              value: {{ .Values.jwt.signInUsername | quote }}
+            {{- end }}
+
             {{- if .Values.git.privateKey }}
             - name: GITDB_PRIVATE_KEY
               value: {{ .Values.git.privateKey | quote }}
@@ -56,22 +67,13 @@ spec:
             - name: GITDB_REPOS
               value: {{ .Values.git.repos | quote }}
             {{- end }}
-            {{- if .Values.git.privateKeyPassword }}
-            - name: GITDB_PRIVATE_KEY_PASSWD
-              value: {{ .Values.git.privateKeyPassword | quote }}
-            {{- end }}
-            {{- end }}
-            {{- if .Values.github }}
             {{- if .Values.github.pushToken }}
             - name: GITHUB_PUSH_TOKEN
               value: {{ .Values.github.pushToken | quote }}
             {{- end }}
-            {{- end }}
-            {{- if .Values.tracer }}
             {{- if .Values.tracer.name }}
             - name: GITDB_TRACER
               value: {{ .Values.tracer.name | quote }}
-            {{- end }}
             {{- end }}
             - name: SSH_KNOWN_HOSTS
               value: /etc/ssh/ssh_known_hosts
@@ -92,7 +94,7 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
           {{- end}}
           volumeMounts:
-          {{- if (and .Values.git .Values.git.secretName) }}
+          {{- if .Values.git.secretName }}
             - mountPath: /etc/gitdb
               name: git-key
               readOnly: true

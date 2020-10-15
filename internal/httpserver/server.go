@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"context"
+	"crypto/rsa"
 	"fmt"
 	"io"
 	"net/http"
@@ -93,7 +94,7 @@ func NotFoundHandler(logger *log.Logger) http.Handler {
 type JWTSignIn struct {
 	Logger        *log.Logger
 	Auth          func(username string, password string) (bool, error)
-	SigningString func(username string) []byte
+	SigningString func(username string) *rsa.PrivateKey
 }
 
 func (j *JWTSignIn) ServeHTTP(writer http.ResponseWriter, request *http.Request) {

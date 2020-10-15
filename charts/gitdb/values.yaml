@@ -25,24 +25,29 @@ serviceAccount:
 
 podAnnotations: {}
 
-git: {}
-#  secretName: ""
-#  privateKey: ""
-#  repos: ""
-#  privateKeyPassword: ""
+git:
+  secretName:
+  privateKey:
+  repos:
+  privateKeyPassword:
 
 gitdb:
   dataDirectory:
-  jwtSecret:
+  envSecrets:
 
-github: {}
-# pushToken: ""
+jwt:
+  privateKey:
+  publicKey:
+  signInUsername:
+
+github:
+  pushToken:
 
 extraVolumes: []
 extraVolumeMounts: []
 
-tracer: {}
-# name: "datadog"
+tracer:
+  name:
 
 podSecurityContext:
   fsGroup: 10001
