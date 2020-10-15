@@ -198,7 +198,11 @@ func setupDebugServer(l *log.Logger, listenAddr string, obj interface{}) (func()
 	}, nil
 }
 
-func setupJWT(cfg config, m *mux.Router, h *gitdb.CheckoutHandler) error {
+func setupJWT(cfg config, m *mux.Router, h *gitdb.CheckoutHandler, logger *log.Logger) error {
+	if cfg.JWTPublicKey == "" {
+		logger.Info(context.Background(), "skipping public JWT handler: no public key")
+		return nil
+	}
 	fileContent, err := ioutil.ReadFile(cfg.JWTPublicKey)
 	if err != nil {
 		return fmt.Errorf("unable to read jwt file %s: %w", cfg.JWTPublicKey, err)
@@ -265,11 +269,12 @@ func setupServer(cfg config, z *log.Logger, rootTracer tracing.Tracing, coHandle
 		return req.URL.Path == "/health"
 	}))
 	rootMux.Handle("/health", httpserver.HealthHandler(z.With(zap.String("handler", "health")), rootTracer)).Name("health")
+	coHandler.SetupMux(rootMux)
 	if githubProvider != nil {
 		z.Info(context.Background(), "setting up github provider path")
 		githubProvider.SetupMux(rootMux)
 	}
-	z.IfErr(setupJWT(cfg, rootMux, coHandler)).Panic(context.Background(), "unable to public JWT endpoint")
+	z.IfErr(setupJWT(cfg, rootMux, coHandler, z)).Panic(context.Background(), "unable to public JWT endpoint")
 	z.IfErr(setupJWTSigning(context.Background(), cfg, z, rootMux)).Panic(context.Background(), "unable to setup JWT signing")
 	rootMux.NotFoundHandler = httpserver.NotFoundHandler(z)
 	rootMux.Use(tracing.MuxTagging(rootTracer))
