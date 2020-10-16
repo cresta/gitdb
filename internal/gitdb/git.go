@@ -148,13 +148,14 @@ func (g *GitCheckout) LsFiles(ctx context.Context) ([]string, error) {
 	return ret, err
 }
 
-func ZipContent(ctx context.Context, into io.Writer, prefix string, from *GitCheckout) error {
+func ZipContent(ctx context.Context, into io.Writer, prefix string, from *GitCheckout) (int, error) {
 	w := zip.NewWriter(into)
 	files, err := from.LsFiles(ctx)
 	prefix = strings.Trim(prefix, "/")
 	if err != nil {
-		return fmt.Errorf("unable to list files: %w", err)
+		return 0, fmt.Errorf("unable to list files: %w", err)
 	}
+	numFiles := 0
 	for _, file := range files {
 		if !strings.HasPrefix(file, prefix) {
 			continue
@@ -162,20 +163,21 @@ func ZipContent(ctx context.Context, into io.Writer, prefix string, from *GitChe
 		filePath := file[len(prefix):]
 		wf, err := w.Create(strings.TrimPrefix(filePath, "/"))
 		if err != nil {
-			return fmt.Errorf("unable to create file at path %s: %w", filePath, err)
+			return numFiles, fmt.Errorf("unable to create file at path %s: %w", filePath, err)
 		}
 		wt, err := from.FileContent(ctx, file)
 		if err != nil {
-			return fmt.Errorf("unable to get file content for %s: %w", file, err)
+			return numFiles, fmt.Errorf("unable to get file content for %s: %w", file, err)
 		}
 		if _, err := wt.WriteTo(wf); err != nil {
-			return fmt.Errorf("unable to write file named %s: %w", file, err)
+			return numFiles, fmt.Errorf("unable to write file named %s: %w", file, err)
 		}
+		numFiles++
 	}
 	if err := w.Close(); err != nil {
-		return fmt.Errorf("unable to close zip: %w", err)
+		return numFiles, fmt.Errorf("unable to close zip: %w", err)
 	}
-	return nil
+	return numFiles, nil
 }
 
 type FileStat struct {

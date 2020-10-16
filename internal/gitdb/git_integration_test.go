@@ -74,7 +74,8 @@ func TestZipContent(t *testing.T) {
 	defer cleanupRepo(t, c)
 	ctx := context.Background()
 	var buf bytes.Buffer
-	require.NoError(t, ZipContent(ctx, &buf, "adir/", c))
+	_, err := ZipContent(ctx, &buf, "adir/", c)
+	require.NoError(t, err)
 
 	// Now try unzipping to make sure it matches
 	r, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))

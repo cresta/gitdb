@@ -253,11 +253,17 @@ func (h *CheckoutHandler) zipDirHandler(req *http.Request) httpserver.CanHTTPWri
 		}
 	}
 	var buf bytes.Buffer
-	if err := ZipContent(req.Context(), &buf, dir, r); err != nil {
+	if numFiles, err := ZipContent(req.Context(), &buf, dir, r); err != nil {
 		logger.Warn(req.Context(), "unable to zip content", zap.Error(err))
 		return &httpserver.BasicResponse{
 			Code: http.StatusInternalServerError,
 			Msg:  strings.NewReader(fmt.Sprintf("unable to zip content for %s: %v", dir, err)),
+		}
+	} else if numFiles == 0 {
+		logger.Warn(req.Context(), "no files in path")
+		return &httpserver.BasicResponse{
+			Code: http.StatusNotFound,
+			Msg:  strings.NewReader(fmt.Sprintf("no files in path %s", dir)),
 		}
 	}
 	return &httpserver.BasicResponse{
