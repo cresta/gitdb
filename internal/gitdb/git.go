@@ -151,6 +151,7 @@ func (g *GitCheckout) LsFiles(ctx context.Context) ([]string, error) {
 func ZipContent(ctx context.Context, into io.Writer, prefix string, from *GitCheckout) error {
 	w := zip.NewWriter(into)
 	files, err := from.LsFiles(ctx)
+	prefix = strings.Trim(prefix, "/")
 	if err != nil {
 		return fmt.Errorf("unable to list files: %w", err)
 	}
@@ -159,7 +160,7 @@ func ZipContent(ctx context.Context, into io.Writer, prefix string, from *GitChe
 			continue
 		}
 		filePath := file[len(prefix):]
-		wf, err := w.Create(filePath)
+		wf, err := w.Create(strings.TrimPrefix(filePath, "/"))
 		if err != nil {
 			return fmt.Errorf("unable to create file at path %s: %w", filePath, err)
 		}
