@@ -3,6 +3,7 @@
 package gitdb
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"errors"
@@ -66,6 +67,34 @@ func statsToName(in []FileStat) []string {
 		ret = append(ret, i.Name)
 	}
 	return ret
+}
+
+func TestZipContent(t *testing.T) {
+	c := withRepo(t)
+	defer cleanupRepo(t, c)
+	ctx := context.Background()
+	var buf bytes.Buffer
+	require.NoError(t, ZipContent(ctx, &buf, "adir/", c))
+
+	// Now try unzipping to make sure it matches
+	r, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
+	require.NoError(t, err)
+	require.Equal(t, 3, len(r.File))
+	findFile := func(files []*zip.File, name string) *zip.File {
+		for _, f := range files {
+			if f.Name == name {
+				return f
+			}
+		}
+		return nil
+	}
+	f := findFile(r.File, "subdir/subdir_file.txt")
+	require.NotNil(t, f)
+	rc, err := f.Open()
+	require.NoError(t, err)
+	d, err := ioutil.ReadAll(rc)
+	require.NoError(t, err)
+	require.Equal(t, "file1\n", string(d))
 }
 
 func TestGitgitCheckout_LsDir_subdir(t *testing.T) {

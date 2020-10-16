@@ -105,11 +105,13 @@ func (h *CheckoutHandler) SetupPublicJWTHandler(mux *mux.Router, keyFunc jwt.Key
 
 	mux.Methods(http.MethodGet).Path("/public/file/{repo}/{branch}/{path:.*}").Handler(middleware.Handler(httpserver.BasicHandler(h.getFileHandler, h.Log))).Name("public_get_file_handler")
 	mux.Methods(http.MethodGet).Path("/public/ls/{repo}/{branch}/{dir:.*}").Handler(middleware.Handler(httpserver.BasicHandler(h.lsDirHandler, h.Log))).Name("public_ls_dir_handler")
+	mux.Methods(http.MethodGet).Path("/publiczip/{repo}/{branch}/{dir:.*}").Handler(middleware.Handler(httpserver.BasicHandler(h.zipDirHandler, h.Log))).Name("public_zip_dir_handler")
 }
 
 func (h *CheckoutHandler) SetupMux(mux *mux.Router) {
 	mux.Methods(http.MethodGet).Path("/file/{repo}/{branch}/{path:.*}").Handler(httpserver.BasicHandler(h.getFileHandler, h.Log)).Name("get_file_handler")
 	mux.Methods(http.MethodGet).Path("/ls/{repo}/{branch}/{dir:.*}").Handler(httpserver.BasicHandler(h.lsDirHandler, h.Log)).Name("ls_dir_handler")
+	mux.Methods(http.MethodGet).Path("/zip/{repo}/{branch}/{dir:.*}").Handler(httpserver.BasicHandler(h.zipDirHandler, h.Log)).Name("zip_dir_handler")
 	mux.Methods(http.MethodPost).Path("/refresh/{repo}").Handler(httpserver.BasicHandler(h.refreshRepoHandler, h.Log)).Name("refresh_repo")
 	mux.Methods(http.MethodPost).Path("/refreshall").Handler(httpserver.BasicHandler(h.refreshAllRepoHandler, h.Log)).Name("refresh_all")
 }
@@ -217,6 +219,52 @@ func (h *CheckoutHandler) lsDirHandler(req *http.Request) httpserver.CanHTTPWrit
 		Msg:  FileStatArr(stat),
 		Headers: map[string]string{
 			"Content-Type": "application/json",
+		},
+	}
+}
+
+func (h *CheckoutHandler) zipDirHandler(req *http.Request) httpserver.CanHTTPWrite {
+	vars := mux.Vars(req)
+	repo := vars["repo"]
+	branch := vars["branch"]
+	dir := vars["dir"]
+	logger := h.Log.With(zap.String("repo", repo), zap.String("branch", branch), zap.String("dir", dir))
+	logger.Debug(req.Context(), "ls dir handler")
+	if repo == "" || branch == "" {
+		logger.Warn(req.Context(), "unable to find repo/branch")
+		return &httpserver.BasicResponse{
+			Code: http.StatusNotFound,
+			Msg:  strings.NewReader(fmt.Sprintf("One unset{repo: %s, branch: %s}", repo, branch)),
+		}
+	}
+	r, exists := h.Checkouts[repo]
+	if !exists {
+		buf := strings.NewReader(fmt.Sprintf("unable to find repo %s", repo))
+		logger.Warn(req.Context(), "invalid repo")
+		return &httpserver.BasicResponse{Code: http.StatusNotFound, Msg: buf}
+	}
+	branchAsRef := plumbing.NewRemoteReferenceName("origin", branch)
+	r, err := r.WithReference(req.Context(), branchAsRef.String())
+	if err != nil {
+		logger.Warn(req.Context(), "invalid branch", zap.Error(err))
+		return &httpserver.BasicResponse{
+			Code: http.StatusNotFound,
+			Msg:  strings.NewReader(fmt.Sprintf("unable to find branch %s for repo %s", branch, repo)),
+		}
+	}
+	var buf bytes.Buffer
+	if err := ZipContent(req.Context(), &buf, dir, r); err != nil {
+		logger.Warn(req.Context(), "unable to zip content", zap.Error(err))
+		return &httpserver.BasicResponse{
+			Code: http.StatusInternalServerError,
+			Msg:  strings.NewReader(fmt.Sprintf("unable to zip content for %s: %v", dir, err)),
+		}
+	}
+	return &httpserver.BasicResponse{
+		Code: http.StatusOK,
+		Msg:  &buf,
+		Headers: map[string]string{
+			"Content-Type": "application/zip",
 		},
 	}
 }
