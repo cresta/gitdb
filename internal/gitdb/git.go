@@ -1,17 +1,17 @@
 package gitdb
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"sort"
-
-	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
-	ssh2 "golang.org/x/crypto/ssh"
+	"strings"
 
 	"github.com/go-git/go-git/v5/plumbing/transport/client"
+	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 
 	"github.com/cresta/gitdb/internal/gitdb/tracing"
 
@@ -146,6 +146,38 @@ func (g *GitCheckout) LsFiles(ctx context.Context) ([]string, error) {
 		return nil
 	})
 	return ret, err
+}
+
+func ZipContent(ctx context.Context, into io.Writer, prefix string, from *GitCheckout) (int, error) {
+	w := zip.NewWriter(into)
+	files, err := from.LsFiles(ctx)
+	prefix = strings.Trim(prefix, "/")
+	if err != nil {
+		return 0, fmt.Errorf("unable to list files: %w", err)
+	}
+	numFiles := 0
+	for _, file := range files {
+		if !strings.HasPrefix(file, prefix) {
+			continue
+		}
+		filePath := file[len(prefix):]
+		wf, err := w.Create(strings.TrimPrefix(filePath, "/"))
+		if err != nil {
+			return numFiles, fmt.Errorf("unable to create file at path %s: %w", filePath, err)
+		}
+		wt, err := from.FileContent(ctx, file)
+		if err != nil {
+			return numFiles, fmt.Errorf("unable to get file content for %s: %w", file, err)
+		}
+		if _, err := wt.WriteTo(wf); err != nil {
+			return numFiles, fmt.Errorf("unable to write file named %s: %w", file, err)
+		}
+		numFiles++
+	}
+	if err := w.Close(); err != nil {
+		return numFiles, fmt.Errorf("unable to close zip: %w", err)
+	}
+	return numFiles, nil
 }
 
 type FileStat struct {
@@ -289,31 +321,58 @@ func (l *LoggedClient) NewReceivePackSession(endpoint *transport.Endpoint, authM
 	return ret, err
 }
 
-type ContextCurriedAuth struct {
+type ContextCurried struct {
 	ctx context.Context
+}
+
+func (c *ContextCurried) Ctx() context.Context {
+	return c.ctx
+}
+
+type ContextCurriedAuth struct {
+	ContextCurried
 	transport.AuthMethod
 }
 
-func (c *ContextCurriedAuth) ClientConfig() (*ssh2.ClientConfig, error) {
-	if root, ok := c.AuthMethod.(ssh.AuthMethod); ok {
-		return root.ClientConfig()
-	}
-	return nil, errors.New("wrapped auth does not have client config")
+func (c *ContextCurriedAuth) Unwrap() transport.AuthMethod {
+	return c.AuthMethod
+}
+
+type ContextCurriedSSHAuth struct {
+	ContextCurried
+	ssh.AuthMethod
+}
+
+func (c *ContextCurriedSSHAuth) Unwrap() transport.AuthMethod {
+	return c.AuthMethod
 }
 
 // https://github.com/go-git/go-git/issues/185
-var _ ssh.AuthMethod = &ContextCurriedAuth{}
+var _ ssh.AuthMethod = &ContextCurriedSSHAuth{}
 
-func attachContextToAuth(ctx context.Context, auth transport.AuthMethod) *ContextCurriedAuth {
+func attachContextToAuth(ctx context.Context, auth transport.AuthMethod) transport.AuthMethod {
+	if sshAuth, ok := auth.(ssh.AuthMethod); ok {
+		return &ContextCurriedSSHAuth{
+			AuthMethod: sshAuth,
+			ContextCurried: ContextCurried{
+				ctx: ctx,
+			},
+		}
+	}
 	return &ContextCurriedAuth{
-		ctx:        ctx,
+		ContextCurried: ContextCurried{
+			ctx: ctx,
+		},
 		AuthMethod: auth,
 	}
 }
 
 func unwrapAuth(t transport.AuthMethod) transport.AuthMethod {
-	if root, ok := t.(*ContextCurriedAuth); ok {
-		return root.AuthMethod
+	type unwrapable interface {
+		Unwrap() transport.AuthMethod
+	}
+	if root, ok := t.(unwrapable); ok {
+		return root.Unwrap()
 	}
 	return t
 }
@@ -322,8 +381,11 @@ func contextFromAuth(a transport.AuthMethod) context.Context {
 	if a == nil {
 		return context.Background()
 	}
-	if obj, ok := a.(*ContextCurriedAuth); ok {
-		return obj.ctx
+	type ctx interface {
+		Ctx() context.Context
+	}
+	if obj, ok := a.(ctx); ok {
+		return obj.Ctx()
 	}
 	return context.Background()
 }
