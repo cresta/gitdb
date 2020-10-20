@@ -105,7 +105,7 @@ func (h *CheckoutHandler) SetupPublicJWTHandler(mux *mux.Router, keyFunc jwt.Key
 
 	mux.Methods(http.MethodGet).Path("/public/file/{repo}/{branch}/{path:.*}").Handler(middleware.Handler(httpserver.BasicHandler(h.getFileHandler, h.Log))).Name("public_get_file_handler")
 	mux.Methods(http.MethodGet).Path("/public/ls/{repo}/{branch}/{dir:.*}").Handler(middleware.Handler(httpserver.BasicHandler(h.lsDirHandler, h.Log))).Name("public_ls_dir_handler")
-	mux.Methods(http.MethodGet).Path("/publiczip/{repo}/{branch}/{dir:.*}").Handler(middleware.Handler(httpserver.BasicHandler(h.zipDirHandler, h.Log))).Name("public_zip_dir_handler")
+	mux.Methods(http.MethodGet).Path("/public/zip/{repo}/{branch}/{dir:.*}").Handler(middleware.Handler(httpserver.BasicHandler(h.zipDirHandler, h.Log))).Name("public_zip_dir_handler")
 }
 
 func (h *CheckoutHandler) SetupMux(mux *mux.Router) {
