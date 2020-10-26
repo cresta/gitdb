@@ -92,7 +92,7 @@ spec:
           volumeMounts:
           {{- if .Values.repoConfig }}
             - mountPath: /etc/gitdb_config
-              name: gitdb_config
+              name: gitdbconfig
               readOnly: true
           {{- end }}
           {{- if .Values.git.secretName }}
@@ -117,7 +117,7 @@ spec:
       {{- end }}
       volumes:
       {{- if .Values.repoConfig }}
-      - name: gitdb_config
+      - name: gitdbconfig
         configMap:
           name: {{ include "gitdb.fullname" . }}-repos
       {{- end }}
