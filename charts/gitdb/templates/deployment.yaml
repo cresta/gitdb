@@ -41,6 +41,10 @@ spec:
                 name: {{ .Values.gitdb.envSecrets }}
           {{- end }}
           env:
+            {{- if .Values.repoConfig }}
+            - name: GITDB_REPO_CONFIG
+              value: /etc/gitdb_config
+            {{- end }}
             {{- if .Values.gitdb.dataDirectory }}
             - name: DATA_DIRECTORY
               value: {{ .Values.gitdb.dataDirectory | quote }}
@@ -94,6 +98,11 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
           {{- end}}
           volumeMounts:
+          {{- if .Values.repoConfig }}
+            - mountPath: /etc/gitdb_config
+              name: gitdb_config
+              readOnly: true
+          {{- end }}
           {{- if .Values.git.secretName }}
             - mountPath: /etc/gitdb
               name: git-key
@@ -115,6 +124,11 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       volumes:
+      {{- if .Values.repoConfig }}
+      - name: gitdb_config
+        configMap:
+          name: {{ include "gitdb.fullname" . }}-repos
+      {{- end }}
       {{- if .Values.git.secretName }}
       - name: git-key
         secret:

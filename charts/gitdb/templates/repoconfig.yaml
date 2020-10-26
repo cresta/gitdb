@@ -1,0 +1,10 @@
+{{- if .Values.repoConfig }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "gitdb.fullname" . }}-repos
+  labels:
+  {{- include "gitdb.labels" . | nindent 4 }}
+data:
+  {{ toYaml .Values.repoConfig | indent 12 }}
+{{- end }}
