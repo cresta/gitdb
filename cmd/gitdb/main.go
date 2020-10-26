@@ -64,10 +64,7 @@ func getConfig() config {
 		Tracer:          os.Getenv("GITDB_TRACER"),
 		RepoConfig:      os.Getenv("GITDB_REPO_CONFIG"),
 
-		//		Repos:           os.Getenv("GITDB_REPOS"),
-		//		PrivateKey:      os.Getenv("GITDB_PRIVATE_KEY"),
 		GithubPushToken: os.Getenv("GITHUB_PUSH_TOKEN"),
-		//		PrivateKeyPasswd: os.Getenv("GITDB_PRIVATE_KEY_PASSWD"),
 		JWTPrivateKey:       os.Getenv("GITDB_JWT_PRIVATE_KEY"),
 		JWTPrivateKeyPasswd: os.Getenv("GITDB_JWT_PRIVATE_KEY_PASSWD"),
 		JWTPublicKey:        os.Getenv("GITDB_JWT_PUBLIC_KEY"),
