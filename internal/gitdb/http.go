@@ -27,19 +27,21 @@ import (
 )
 
 type Config struct {
-	DataDirectory    string
-	Repos            string
-	PrivateKey       string
-	PrivateKeyPasswd string
+	DataDirectory string
+	Repos         []Repository
+}
+
+type Repository struct {
+	URL                    string
+	PrivateKey             string
+	PrivateKeyPassword     string
+	PrivateKeyPasswordFile string
+	Alias                  string
+	Public                 bool
 }
 
 func NewHandler(logger *log.Logger, cfg Config, tracer tracing.Tracing) (*CheckoutHandler, error) {
 	logger.Info(context.Background(), "setting up git server")
-	publicKeys, err := getPrivateKeys(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("unable to load private key: %w", err)
-	}
-	logger.Info(context.Background(), "public keys loaded", zap.Int("num_keys", len(publicKeys)))
 	g := GitOperator{
 		Log:    logger,
 		Tracer: tracer,
@@ -48,36 +50,47 @@ func NewHandler(logger *log.Logger, cfg Config, tracer tracing.Tracing) (*Checko
 	if dataDir == "" {
 		dataDir = os.TempDir()
 	}
-	repos := strings.Split(cfg.Repos, ",")
 	gitCheckouts := make(map[string]*GitCheckout)
+	checkoutConfigs := make(map[string]Repository)
 	ctx := context.Background()
-	for idx, repo := range repos {
-		repo := strings.TrimSpace(repo)
-		if repo == "" {
-			continue
+	for idx, repo := range cfg.Repos {
+		trimmedRepoURL := strings.TrimSpace(repo.URL)
+		if trimmedRepoURL == "" {
+			return nil, fmt.Errorf("unable to find URL for repo index %d", idx)
 		}
-		cloneInto, err := ioutil.TempDir(dataDir, "gitdb_repo_"+sanitizeDir(repo))
+		cloneInto, err := ioutil.TempDir(dataDir, "gitdb_repo_"+sanitizeDir(trimmedRepoURL))
 		if err != nil {
-			return nil, fmt.Errorf("unable to make temp dir for %s,%s: %w", dataDir, "gitdb_repo_"+sanitizeDir(repo), err)
+			return nil, fmt.Errorf("unable to make temp dir for %s,%s: %w", dataDir, "gitdb_repo_"+sanitizeDir(trimmedRepoURL), err)
 		}
-		co, err := g.Clone(ctx, cloneInto, repo, getPublicKey(publicKeys, idx))
+		authMethod, err := getAuthMethod(repo)
 		if err != nil {
-			return nil, fmt.Errorf("unable to clone repo %s: %w", repo, err)
+			return nil, fmt.Errorf("unable to load private key: %w", err)
 		}
-		gitCheckouts[getRepoKey(repo)] = co
-		logger.Info(context.Background(), "setup checkout", zap.String("repo", repo), zap.String("key", getRepoKey(repo)), zap.String("into", cloneInto))
+		co, err := g.Clone(ctx, cloneInto, trimmedRepoURL, authMethod)
+		if err != nil {
+			return nil, fmt.Errorf("unable to clone repo %s: %w", trimmedRepoURL, err)
+		}
+		repoKey := repo.Alias
+		if repoKey == "" {
+			repoKey = getRepoKey(trimmedRepoURL)
+		}
+		gitCheckouts[repoKey] = co
+		checkoutConfigs[repoKey] = repo
+		logger.Info(context.Background(), "setup checkout", zap.String("repo", trimmedRepoURL), zap.String("key", repoKey), zap.String("into", cloneInto))
 	}
-	logger.Info(context.Background(), "repos loaded", zap.Int("num_keys", len(repos)))
+	logger.Info(context.Background(), "repos loaded", zap.Int("num_keys", len(cfg.Repos)))
 	ret := &CheckoutHandler{
-		Checkouts: gitCheckouts,
-		Log:       logger.With(zap.String("class", "checkout_handler")),
+		Checkouts:       gitCheckouts,
+		checkoutConfigs: checkoutConfigs,
+		Log:             logger.With(zap.String("class", "checkout_handler")),
 	}
 	return ret, nil
 }
 
 type CheckoutHandler struct {
-	Checkouts map[string]*GitCheckout
-	Log       *log.Logger
+	Checkouts       map[string]*GitCheckout
+	Log             *log.Logger
+	checkoutConfigs map[string]Repository
 }
 
 func (h *CheckoutHandler) CheckoutsByRepo() map[string]*GitCheckout {
@@ -88,7 +101,10 @@ func (h *CheckoutHandler) CheckoutsByRepo() map[string]*GitCheckout {
 	return ret
 }
 
-func (h *CheckoutHandler) SetupPublicJWTHandler(mux *mux.Router, keyFunc jwt.Keyfunc) {
+func (h *CheckoutHandler) SetupPublicJWTHandler(muxRouter *mux.Router, keyFunc jwt.Keyfunc, repos []Repository) {
+	if noPublicRepos(repos) {
+		return
+	}
 	middleware := jwtmiddleware.New(jwtmiddleware.Options{
 		ValidationKeyGetter: keyFunc,
 		SigningMethod:       jwt.SigningMethodRS256,
@@ -102,10 +118,34 @@ func (h *CheckoutHandler) SetupPublicJWTHandler(mux *mux.Router, keyFunc jwt.Key
 			resp.HTTPWrite(r.Context(), w, h.Log)
 		},
 	})
+	publicRepoMiddleware := func(root http.Handler) http.Handler {
+		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			vars := mux.Vars(request)
+			repo := vars["repo"]
+			if repoCfg, exists := h.checkoutConfigs[repo]; !exists {
+				writer.WriteHeader(http.StatusNotFound)
+				return
+			} else if !repoCfg.Public {
+				h.Log.Warn(request.Context(), "attempting to fetch private repo from public endpoint", zap.String("repo", repo))
+				writer.WriteHeader(http.StatusNotFound)
+				return
+			}
+			root.ServeHTTP(writer, request)
+		})
+	}
 
-	mux.Methods(http.MethodGet).Path("/public/file/{repo}/{branch}/{path:.*}").Handler(middleware.Handler(httpserver.BasicHandler(h.getFileHandler, h.Log))).Name("public_get_file_handler")
-	mux.Methods(http.MethodGet).Path("/public/ls/{repo}/{branch}/{dir:.*}").Handler(middleware.Handler(httpserver.BasicHandler(h.lsDirHandler, h.Log))).Name("public_ls_dir_handler")
-	mux.Methods(http.MethodGet).Path("/public/zip/{repo}/{branch}/{dir:.*}").Handler(middleware.Handler(httpserver.BasicHandler(h.zipDirHandler, h.Log))).Name("public_zip_dir_handler")
+	muxRouter.Methods(http.MethodGet).Path("/public/file/{repo}/{branch}/{path:.*}").Handler(publicRepoMiddleware(middleware.Handler(httpserver.BasicHandler(h.getFileHandler, h.Log)))).Name("public_get_file_handler")
+	muxRouter.Methods(http.MethodGet).Path("/public/ls/{repo}/{branch}/{dir:.*}").Handler(publicRepoMiddleware(middleware.Handler(httpserver.BasicHandler(h.lsDirHandler, h.Log)))).Name("public_ls_dir_handler")
+	muxRouter.Methods(http.MethodGet).Path("/public/zip/{repo}/{branch}/{dir:.*}").Handler(publicRepoMiddleware(middleware.Handler(httpserver.BasicHandler(h.zipDirHandler, h.Log)))).Name("public_zip_dir_handler")
+}
+
+func noPublicRepos(repos []Repository) bool {
+	for _, repo := range repos {
+		if repo.Public {
+			return false
+		}
+	}
+	return true
 }
 
 func (h *CheckoutHandler) SetupMux(mux *mux.Router) {
@@ -334,41 +374,20 @@ func sanitizeDir(s string) string {
 	}, s)
 }
 
-func getPublicKey(k []transport.AuthMethod, idx int) transport.AuthMethod {
-	if len(k) == 0 {
-		return nil
-	}
-	if len(k) == 1 {
-		return k[0]
-	}
-	if idx >= len(k) {
-		return nil
-	}
-	return k[idx]
-}
-
-func getPrivateKeys(cfg Config) ([]transport.AuthMethod, error) {
-	pKey := strings.TrimSpace(cfg.PrivateKey)
+func getAuthMethod(repo Repository) (transport.AuthMethod, error) {
+	pKey := strings.TrimSpace(repo.PrivateKey)
 	if pKey == "" {
 		return nil, nil
 	}
-	files := strings.Split(pKey, ",")
-	ret := make([]transport.AuthMethod, 0, len(files))
-	for _, file := range files {
-		if file == "" {
-			ret = append(ret, nil)
-		}
-		sshKey, err := ioutil.ReadFile(file)
-		if err != nil {
-			return nil, fmt.Errorf("unable to read file %s: %w", file, err)
-		}
-		publicKey, err := ssh.NewPublicKeys("git", sshKey, cfg.PrivateKeyPasswd)
-		if err != nil {
-			return nil, fmt.Errorf("unable to load public keys: %w", err)
-		}
-		ret = append(ret, publicKey)
+	sshKey, err := ioutil.ReadFile(pKey)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read file %s: %w", pKey, err)
 	}
-	return ret, nil
+	publicKey, err := ssh.NewPublicKeys("git", sshKey, repo.PrivateKeyPassword)
+	if err != nil {
+		return nil, fmt.Errorf("unable to load public keys: %w", err)
+	}
+	return publicKey, nil
 }
 
 func getRepoKey(repo string) string {

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/rsa"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -30,10 +31,8 @@ type config struct {
 	ListenAddr          string
 	DataDirectory       string
 	DebugListenAddr     string
-	Repos               string
-	PrivateKey          string
-	PrivateKeyPasswd    string
 	GithubPushToken     string
+	RepoConfig          string
 	Tracer              string
 	JWTPrivateKey       string
 	JWTPrivateKeyPasswd string
@@ -58,16 +57,17 @@ func (c config) WithDefaults() config {
 func getConfig() config {
 	return config{
 		// Defaults to ":8080"
-		ListenAddr:      os.Getenv("LISTEN_ADDR"),
-		DataDirectory:   os.Getenv("DATA_DIRECTORY"),
-		Repos:           os.Getenv("GITDB_REPOS"),
-		PrivateKey:      os.Getenv("GITDB_PRIVATE_KEY"),
-		GithubPushToken: os.Getenv("GITHUB_PUSH_TOKEN"),
+		ListenAddr:    os.Getenv("LISTEN_ADDR"),
+		DataDirectory: os.Getenv("DATA_DIRECTORY"),
 		// Defaults to ":6060"
-		DebugListenAddr:  os.Getenv("GITDB_DEBUG_ADDR"),
-		PrivateKeyPasswd: os.Getenv("GITDB_PRIVATE_KEY_PASSWD"),
-		Tracer:           os.Getenv("GITDB_TRACER"),
+		DebugListenAddr: os.Getenv("GITDB_DEBUG_ADDR"),
+		Tracer:          os.Getenv("GITDB_TRACER"),
+		RepoConfig:      os.Getenv("GITDB_REPO_CONFIG"),
 
+		//		Repos:           os.Getenv("GITDB_REPOS"),
+		//		PrivateKey:      os.Getenv("GITDB_PRIVATE_KEY"),
+		GithubPushToken: os.Getenv("GITHUB_PUSH_TOKEN"),
+		//		PrivateKeyPasswd: os.Getenv("GITDB_PRIVATE_KEY_PASSWD"),
 		JWTPrivateKey:       os.Getenv("GITDB_JWT_PRIVATE_KEY"),
 		JWTPrivateKeyPasswd: os.Getenv("GITDB_JWT_PRIVATE_KEY_PASSWD"),
 		JWTPublicKey:        os.Getenv("GITDB_JWT_PUBLIC_KEY"),
@@ -75,6 +75,12 @@ func getConfig() config {
 		JWTSignInPassword:   os.Getenv("GITDB_JWT_SIGNIN_PASSWORD"),
 	}.WithDefaults()
 }
+
+type RepoConfig struct {
+	Repositories []Repository
+}
+
+type Repository = gitdb.Repository
 
 func main() {
 	instance.Main()
@@ -107,6 +113,21 @@ func setupLogging() (*log.Logger, error) {
 	return log.New(l), nil
 }
 
+func (m *Service) loadRepoConfig(cfg config) (RepoConfig, error) {
+	if cfg.RepoConfig == "" {
+		return RepoConfig{}, nil
+	}
+	b, err := ioutil.ReadFile(cfg.RepoConfig)
+	if err != nil {
+		return RepoConfig{}, fmt.Errorf("unable to read file %s: %w", cfg.RepoConfig, err)
+	}
+	var ret RepoConfig
+	if err := json.Unmarshal(b, &ret); err != nil {
+		return RepoConfig{}, fmt.Errorf("unable to json unmarshal content of %s: %w", cfg.RepoConfig, err)
+	}
+	return ret, nil
+}
+
 func (m *Service) Main() {
 	cfg := m.config
 	if m.log == nil {
@@ -128,14 +149,20 @@ func (m *Service) Main() {
 		m.osExit(1)
 		return
 	}
+
+	repoConfig, err := m.loadRepoConfig(cfg)
+	if err != nil {
+		m.log.IfErr(err).Error(context.Background(), "unable to load repository config")
+		m.osExit(1)
+		return
+	}
+
 	gitdb.WrapGitProtocols(rootTracer)
 	m.log = m.log.DynamicFields(rootTracer.DynamicFields()...)
 
 	co, err := gitdb.NewHandler(m.log, gitdb.Config{
-		DataDirectory:    cfg.DataDirectory,
-		Repos:            cfg.Repos,
-		PrivateKey:       cfg.PrivateKey,
-		PrivateKeyPasswd: cfg.PrivateKeyPasswd,
+		DataDirectory: cfg.DataDirectory,
+		Repos:         repoConfig.Repositories,
 	}, rootTracer)
 	if err != nil {
 		m.log.IfErr(err).Panic(context.Background(), "unable to setup git server")
@@ -143,7 +170,7 @@ func (m *Service) Main() {
 		return
 	}
 	githubListener := github.Setup(cfg.GithubPushToken, m.log, co, rootTracer)
-	m.server = setupServer(cfg, m.log, rootTracer, co, githubListener)
+	m.server = setupServer(cfg, m.log, rootTracer, co, githubListener, repoConfig)
 	shutdownCallback, err := setupDebugServer(m.log, cfg.DebugListenAddr, m)
 	if err != nil {
 		m.log.IfErr(err).Panic(context.Background(), "unable to setup debug server")
@@ -198,7 +225,7 @@ func setupDebugServer(l *log.Logger, listenAddr string, obj interface{}) (func()
 	}, nil
 }
 
-func setupJWT(cfg config, m *mux.Router, h *gitdb.CheckoutHandler, logger *log.Logger) error {
+func setupJWT(cfg config, m *mux.Router, h *gitdb.CheckoutHandler, logger *log.Logger, repoConfig RepoConfig) error {
 	if cfg.JWTPublicKey == "" {
 		logger.Info(context.Background(), "skipping public JWT handler: no public key")
 		return nil
@@ -214,7 +241,7 @@ func setupJWT(cfg config, m *mux.Router, h *gitdb.CheckoutHandler, logger *log.L
 	keyFunc := func(token *jwt.Token) (interface{}, error) {
 		return parsedPublicKey, nil
 	}
-	h.SetupPublicJWTHandler(m, keyFunc)
+	h.SetupPublicJWTHandler(m, keyFunc, repoConfig.Repositories)
 	return nil
 }
 
@@ -262,7 +289,7 @@ func setupJWTSigning(ctx context.Context, cfg config, log *log.Logger, m *mux.Ro
 	return nil
 }
 
-func setupServer(cfg config, z *log.Logger, rootTracer tracing.Tracing, coHandler *gitdb.CheckoutHandler, githubProvider *github.Provider) *http.Server {
+func setupServer(cfg config, z *log.Logger, rootTracer tracing.Tracing, coHandler *gitdb.CheckoutHandler, githubProvider *github.Provider, repoConfig RepoConfig) *http.Server {
 	rootMux, rootHandler := rootTracer.CreateRootMux()
 	rootMux.Use(httpserver.MuxMiddleware())
 	rootMux.Use(httpserver.LogMiddleware(z, func(req *http.Request) bool {
@@ -274,7 +301,7 @@ func setupServer(cfg config, z *log.Logger, rootTracer tracing.Tracing, coHandle
 		z.Info(context.Background(), "setting up github provider path")
 		githubProvider.SetupMux(rootMux)
 	}
-	z.IfErr(setupJWT(cfg, rootMux, coHandler, z)).Panic(context.Background(), "unable to public JWT endpoint")
+	z.IfErr(setupJWT(cfg, rootMux, coHandler, z, repoConfig)).Panic(context.Background(), "unable to public JWT endpoint")
 	z.IfErr(setupJWTSigning(context.Background(), cfg, z, rootMux)).Panic(context.Background(), "unable to setup JWT signing")
 	rootMux.NotFoundHandler = httpserver.NotFoundHandler(z)
 	rootMux.Use(tracing.MuxTagging(rootTracer))
