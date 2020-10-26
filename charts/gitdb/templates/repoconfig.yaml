@@ -6,5 +6,6 @@ metadata:
   labels:
   {{- include "gitdb.labels" . | nindent 4 }}
 data:
-  {{ toYaml .Values.repoConfig | indent 12 }}
+  config: |-
+{{ .Values.repoConfig | indent 4 }}
 {{- end }}

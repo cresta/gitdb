@@ -43,7 +43,7 @@ spec:
           env:
             {{- if .Values.repoConfig }}
             - name: GITDB_REPO_CONFIG
-              value: /etc/gitdb_config
+              value: /etc/gitdb_config/config
             {{- end }}
             {{- if .Values.gitdb.dataDirectory }}
             - name: DATA_DIRECTORY
