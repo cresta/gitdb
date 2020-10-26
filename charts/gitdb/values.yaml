@@ -27,9 +27,6 @@ podAnnotations: {}
 
 git:
   secretName:
-  privateKey:
-  repos:
-  privateKeyPassword:
 
 repoConfig: {}
 
