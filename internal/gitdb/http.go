@@ -137,6 +137,8 @@ func (h *CheckoutHandler) SetupPublicJWTHandler(muxRouter *mux.Router, keyFunc j
 	muxRouter.Methods(http.MethodGet).Path("/public/file/{repo}/{branch}/{path:.*}").Handler(publicRepoMiddleware(middleware.Handler(httpserver.BasicHandler(h.getFileHandler, h.Log)))).Name("public_get_file_handler")
 	muxRouter.Methods(http.MethodGet).Path("/public/ls/{repo}/{branch}/{dir:.*}").Handler(publicRepoMiddleware(middleware.Handler(httpserver.BasicHandler(h.lsDirHandler, h.Log)))).Name("public_ls_dir_handler")
 	muxRouter.Methods(http.MethodGet).Path("/public/zip/{repo}/{branch}/{dir:.*}").Handler(publicRepoMiddleware(middleware.Handler(httpserver.BasicHandler(h.zipDirHandler, h.Log)))).Name("public_zip_dir_handler")
+	muxRouter.Methods(http.MethodGet).Path("/refresh/{repo}").Handler(publicRepoMiddleware(middleware.Handler(httpserver.BasicHandler(h.refreshRepoHandler, h.Log)))).Name("refresh_repo")
+	muxRouter.Methods(http.MethodGet).Path("/refreshall").Handler(middleware.Handler(httpserver.BasicHandler(h.refreshAllRepoHandler, h.Log)))).Name("refresh_all")
 }
 
 func noPublicRepos(repos []Repository) bool {
@@ -152,8 +154,8 @@ func (h *CheckoutHandler) SetupMux(mux *mux.Router) {
 	mux.Methods(http.MethodGet).Path("/file/{repo}/{branch}/{path:.*}").Handler(httpserver.BasicHandler(h.getFileHandler, h.Log)).Name("get_file_handler")
 	mux.Methods(http.MethodGet).Path("/ls/{repo}/{branch}/{dir:.*}").Handler(httpserver.BasicHandler(h.lsDirHandler, h.Log)).Name("ls_dir_handler")
 	mux.Methods(http.MethodGet).Path("/zip/{repo}/{branch}/{dir:.*}").Handler(httpserver.BasicHandler(h.zipDirHandler, h.Log)).Name("zip_dir_handler")
-	mux.Methods(http.MethodPost).Path("/refresh/{repo}").Handler(httpserver.BasicHandler(h.refreshRepoHandler, h.Log)).Name("refresh_repo")
-	mux.Methods(http.MethodPost).Path("/refreshall").Handler(httpserver.BasicHandler(h.refreshAllRepoHandler, h.Log)).Name("refresh_all")
+	mux.Methods(http.MethodGet).Path("/refresh/{repo}").Handler(httpserver.BasicHandler(h.refreshRepoHandler, h.Log)).Name("refresh_repo")
+	mux.Methods(http.MethodGet).Path("/refreshall").Handler(httpserver.BasicHandler(h.refreshAllRepoHandler, h.Log)).Name("refresh_all")
 }
 
 func (h *CheckoutHandler) refreshAllRepoHandler(req *http.Request) httpserver.CanHTTPWrite {
