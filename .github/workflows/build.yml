@@ -26,13 +26,13 @@ jobs:
         uses: magefile/mage-action@v1
         with:
           version: latest
-          args: ecr:login docker:build docker:recordImage
+          args: docker:build docker:recordImage
       - name: Push image
         if: github.event_name == 'push'
         uses: magefile/mage-action@v1
         with:
           version: latest
-          args: ecr:login docker:build docker:recordImage
+          args: ghcr:login docker:build docker:recordImage
         env:
           DOCKER_PUSH: true
   go_test:
