@@ -9,21 +9,54 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v2
-      - name: Make builder
-        run: ./make.sh build_builder
-      - name: Lint
-        run: ./make.sh dockerrun lint
-      - name: Test
-        run: ./make.sh dockerrun test
-      - name: Build docker
-        run: ./make.sh build_docker
-      - name: Login to GitHub Container Registry
+      - name: Log into GHCR
         if: github.event_name == 'push'
-        uses: docker/login-action@v1
+        uses: magefile/mage-action@v1
         with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GHCR_PAT }}
-      - name: Push docker image
+          version: latest
+          args: ghcr:login
+        env:
+          GHCR_PAT: ${{ secrets.GHCR_PAT }}
+      - name: Build image
+        if: github.event_name == 'pull_request'
+        uses: magefile/mage-action@v1
+        with:
+          version: latest
+          args: ecr:login docker:build docker:recordImage
+      - name: Push image
         if: github.event_name == 'push'
-        run: ./make.sh push_images
+        uses: magefile/mage-action@v1
+        with:
+          version: latest
+          args: ecr:login docker:build docker:recordImage
+        env:
+          DOCKER_PUSH: true
+  go_test:
+    name: Run go tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.16.3
+      - name: Run tests
+        uses: magefile/mage-action@v1
+        with:
+          version: latest
+          args: go:test
+  go_lint:
+    name: Run go lints
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.16.3
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v2
+        with:
+          version: latest

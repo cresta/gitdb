@@ -1,9 +1,27 @@
-ARG BUILDER_IMAGE
-# hadolint ignore=DL3006
-FROM ${BUILDER_IMAGE} as builder
-RUN mkdir /empty_dir
+FROM golang:1.16.0-buster AS builder
+# hadolint ignore=DL3008
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    xz-utils zip && \
+    rm -rf /var/lib/apt/lists/*
+WORKDIR /work
+
+# Create appuser
+ENV USER=appuser
+ENV UID=10001
+RUN groupadd -r --gid ${UID} ${USER} && useradd --uid ${UID} -m --no-log-init -g ${USER} ${USER}
+
+# Install mage
+ARG MAGE_VERSION=1.11.0
+RUN curl -L -o /tmp/mage.tar.gz "https://github.com/magefile/mage/releases/download/v${MAGE_VERSION}/mage_${MAGE_VERSION}_Linux-64bit.tar.gz" && tar -C /tmp -zxvf /tmp/mage.tar.gz && mv /tmp/mage /usr/local/bin
+
+COPY go.mod /work
+COPY go.sum /work
+RUN go mod download
+RUN go mod verify
 COPY . /work
-RUN ./make.sh build
+RUN mage go:build
+RUN mkdir /empty_dir
 RUN bash /work/known_hosts.sh /etc/ssh/ssh_known_hosts
 
 FROM scratch
@@ -15,11 +33,10 @@ COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=builder /etc/ssh/ssh_known_hosts /etc/ssh/ssh_known_hosts
 
 # Copy our static executable
-COPY --from=builder /work/gitdb /gitdb
+COPY --from=builder /work/main /main
 COPY --chown=appuser --from=builder /empty_dir /tmp
 # Use an unprivileged user.
 USER appuser:appuser
 
-
 EXPOSE 8080
-ENTRYPOINT ["/gitdb"]
+ENTRYPOINT ["/main"]
