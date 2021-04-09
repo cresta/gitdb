@@ -40,7 +40,7 @@ jobs:
         with:
           version: latest
           args: docker:build docker:recordImage
-      - name: Push image
+      - name: Build and Push image
         if: github.event_name == 'push'
         uses: magefile/mage-action@v1
         with:
@@ -48,6 +48,7 @@ jobs:
           args: docker:build docker:recordImage
         env:
           DOCKER_PUSH: true
+          DOCKER_LATEST_BRANCH: master
       - name: Move cache
         uses: magefile/mage-action@v1
         with:
