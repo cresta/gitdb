@@ -19,13 +19,6 @@ jobs:
         id: buildx
         with:
           install: true
-      - name: Cache Docker layers
-        uses: actions/cache@v2
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys:
-            ${{ runner.os }}-buildx-
       - name: Log into GHCR
         if: github.event_name == 'push'
         uses: magefile/mage-action@v1
@@ -47,13 +40,8 @@ jobs:
           version: latest
           args: docker:build docker:recordImage
         env:
+          DOCKER_PUSH_REMOTE_CACHE: true
           DOCKER_PUSH: true
-          DOCKER_LATEST_BRANCH: master
-      - name: Move cache
-        uses: magefile/mage-action@v1
-        with:
-          version: latest
-          args: docker:rotateCache
   go_test:
     name: Run go tests
     runs-on: ubuntu-latest
