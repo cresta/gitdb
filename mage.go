@@ -16,4 +16,5 @@ import (
 func init() {
 	// Install ECR as my registry
 	registry.Instance = ghcr.Instance
+	env.Default("DOCKER_MUTABLE_TAGS", "true")
 }
