@@ -38,7 +38,7 @@ jobs:
         uses: magefile/mage-action@v1
         with:
           version: latest
-          args: docker:build docker:recordImage
+          args: docker:build
         env:
           DOCKER_PUSH_REMOTE_CACHE: true
           DOCKER_PUSH: true
