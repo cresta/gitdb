@@ -131,7 +131,7 @@ func (m *Service) Main() {
 		var err error
 		m.log, err = setupLogging()
 		if err != nil {
-			fmt.Printf("Unable to setup logging: %v", err)
+			fmt.Printf("Unable to run setup logging: %v", err)
 			m.osExit(1)
 			return
 		}
