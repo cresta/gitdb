@@ -234,7 +234,7 @@ func (h *CheckoutHandler) lsDirHandler(req *http.Request) httpserver.CanHTTPWrit
 	}
 	stat, err := r.LsDir(req.Context(), dir, branch)
 	if err != nil {
-		if errors.Is(err, goget.UnknownBranchErr) {
+		if errors.Is(err, goget.ErrUnknownBranch) {
 			return &httpserver.BasicResponse{
 				Code: http.StatusNotFound,
 				Msg:  strings.NewReader(fmt.Sprintf("branch not found %s", branch)),
@@ -283,7 +283,7 @@ func (h *CheckoutHandler) zipDirHandler(req *http.Request) httpserver.CanHTTPWri
 	}
 	var buf bytes.Buffer
 	if numFiles, err := r.ZipContent(req.Context(), &buf, dir, branch); err != nil {
-		if errors.Is(err, goget.UnknownBranchErr) {
+		if errors.Is(err, goget.ErrUnknownBranch) {
 			return &httpserver.BasicResponse{
 				Code: http.StatusNotFound,
 				Msg:  strings.NewReader(fmt.Sprintf("branch not found %s", branch)),
@@ -330,7 +330,7 @@ func (h *CheckoutHandler) getFile(ctx context.Context, repo string, branch strin
 	}
 	f, err := r.GetFile(ctx, branch, path)
 	if err != nil {
-		if errors.Is(err, goget.UnknownBranchErr) {
+		if errors.Is(err, goget.ErrUnknownBranch) {
 			return &httpserver.BasicResponse{
 				Code: http.StatusNotFound,
 				Msg:  strings.NewReader(fmt.Sprintf("branch not found %s", branch)),

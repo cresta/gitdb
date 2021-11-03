@@ -212,18 +212,18 @@ type unknownBranch struct {
 	wraps  error
 }
 
-func (U *unknownBranch) Error() string {
-	return "unknown branch " + U.branch
+func (u *unknownBranch) Error() string {
+	return "unknown branch " + u.branch
 }
 
-func (U *unknownBranch) Unwrap() error {
-	return U.wraps
+func (u *unknownBranch) Unwrap() error {
+	return u.wraps
 }
 
-var UnknownBranchErr = errors.New("unknown branch")
+var ErrUnknownBranch = errors.New("unknown branch")
 
-func (U *unknownBranch) Is(err error) bool {
-	return err == UnknownBranchErr
+func (u *unknownBranch) Is(err error) bool {
+	return err == ErrUnknownBranch
 }
 
 func (g *GitCheckout) LsDir(ctx context.Context, dir string, branch string) (retStat []FileStat, retErr error) {
