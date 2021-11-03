@@ -6,6 +6,7 @@ import (
 	_ "github.com/cresta/magehelper/cicd/githubactions"
 	"github.com/cresta/magehelper/docker/registry"
 	"github.com/cresta/magehelper/env"
+
 	// mage:import go
 	_ "github.com/cresta/magehelper/gobuild"
 	// mage:import docker

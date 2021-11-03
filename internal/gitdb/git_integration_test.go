@@ -12,19 +12,18 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cresta/gitdb/internal/gitdb/goget"
+
 	"github.com/cresta/gitdb/internal/gitdb/tracing"
 
 	"github.com/go-git/go-git/v5/plumbing/object"
 
 	"github.com/cresta/gitdb/internal/testhelp"
 
-	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/stretchr/testify/require"
 )
 
-var stagingRef = string(plumbing.NewRemoteReferenceName("origin", "staging"))
-
-func cleanupRepo(t *testing.T, c *GitCheckout) {
+func cleanupRepo(t *testing.T, c *goget.GitCheckout) {
 	require.NotEqual(t, "/", c.AbsPath())
 	require.NotEmpty(t, c.AbsPath())
 	require.True(t, strings.HasPrefix(c.AbsPath(), os.TempDir()))
@@ -32,7 +31,7 @@ func cleanupRepo(t *testing.T, c *GitCheckout) {
 	require.NoError(t, os.RemoveAll(c.AbsPath()))
 }
 
-func withRepo(t *testing.T) *GitCheckout {
+func withRepo(t *testing.T) *goget.GitCheckout {
 	ctx := context.Background()
 	repo := os.Getenv("TEST_REPO")
 	if repo == "" {
@@ -43,7 +42,7 @@ func withRepo(t *testing.T) *GitCheckout {
 	require.NoError(t, err)
 	require.NotEmpty(t, into)
 	t.Log("Clone into", into)
-	g := GitOperator{
+	g := goget.GitOperator{
 		Log:    testhelp.ZapTestingLogger(t),
 		Tracer: tracing.Noop{},
 	}
@@ -56,12 +55,12 @@ func withRepo(t *testing.T) *GitCheckout {
 func TestGitgitCheckout_LsFiles(t *testing.T) {
 	c := withRepo(t)
 	defer cleanupRepo(t, c)
-	f, err := c.LsFiles(context.Background())
+	f, err := c.LsFiles(context.Background(), "master")
 	require.NoError(t, err)
 	require.Greater(t, len(f), 1)
 }
 
-func statsToName(in []FileStat) []string {
+func statsToName(in []goget.FileStat) []string {
 	ret := make([]string, 0, len(in))
 	for _, i := range in {
 		ret = append(ret, i.Name)
@@ -74,7 +73,7 @@ func TestZipContent(t *testing.T) {
 	defer cleanupRepo(t, c)
 	ctx := context.Background()
 	var buf bytes.Buffer
-	_, err := ZipContent(ctx, &buf, "adir/", c)
+	_, err := c.ZipContent(ctx, &buf, "adir/", "master")
 	require.NoError(t, err)
 
 	// Now try unzipping to make sure it matches
@@ -103,14 +102,14 @@ func TestGitgitCheckout_LsDir_subdir(t *testing.T) {
 	defer cleanupRepo(t, c)
 	verifyDir := func(dir string, expected []string) func(t *testing.T) {
 		return func(t *testing.T) {
-			f, err := c.LsDir(context.Background(), dir)
+			f, err := c.LsDir(context.Background(), dir, "master")
 			require.NoError(t, err)
 			require.Equal(t, expected, statsToName(f))
 		}
 	}
 	verifyError := func(dir string, expected error) func(t *testing.T) {
 		return func(t *testing.T) {
-			_, err := c.LsDir(context.Background(), dir)
+			_, err := c.LsDir(context.Background(), dir, "master")
 			require.Error(t, err)
 			require.True(t, errors.Is(err, expected))
 		}
@@ -128,19 +127,12 @@ func TestGitCheckout_Refresh(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func mustResolve(t *testing.T, c *GitCheckout, ref string) *GitCheckout {
-	ret, err := c.WithReference(context.Background(), ref)
-	require.NoError(t, err)
-	return ret
-}
-
 func TestGitgitCheckout_FileContent(t *testing.T) {
 	defaultCheckout := withRepo(t)
 	defer cleanupRepo(t, defaultCheckout)
-	staging := mustResolve(t, defaultCheckout, stagingRef)
-	mustExist := func(c *GitCheckout, name string, expectedContent string) func(t *testing.T) {
+	mustExist := func(c *goget.GitCheckout, name string, expectedContent string, ref string) func(t *testing.T) {
 		return func(t *testing.T) {
-			content, err := c.FileContent(context.Background(), name)
+			content, err := c.GetFile(context.Background(), ref, name)
 			require.NoError(t, err)
 			var b bytes.Buffer
 			numBytes, err := content.WriteTo(&b)
@@ -150,18 +142,18 @@ func TestGitgitCheckout_FileContent(t *testing.T) {
 		}
 	}
 
-	mustNotExist := func(c *GitCheckout, name string) func(t *testing.T) {
+	mustNotExist := func(c *goget.GitCheckout, name string, ref string) func(t *testing.T) {
 		return func(t *testing.T) {
-			badContent, err := c.FileContent(context.Background(), name)
+			badContent, err := c.GetFile(context.Background(), ref, name)
 			require.Error(t, err)
 			require.Nil(t, badContent)
 		}
 	}
 
-	t.Run("file_in_dir", mustExist(defaultCheckout, "adir/file_in_directory.txt", "file_in_directory\n"))
-	t.Run("on_master", mustExist(defaultCheckout, "on_master.txt", "true\n"))
-	t.Run("on_staging", mustExist(staging, "on_staging.txt", "staging\n"))
+	t.Run("file_in_dir", mustExist(defaultCheckout, "adir/file_in_directory.txt", "file_in_directory\n", "master"))
+	t.Run("on_master", mustExist(defaultCheckout, "on_master.txt", "true\n", "master"))
+	t.Run("on_staging", mustExist(defaultCheckout, "on_staging.txt", "staging\n", "staging"))
 
-	t.Run("bad_name", mustNotExist(defaultCheckout, "must_not_exist"))
-	t.Run("bad_name_for_master", mustNotExist(staging, "on_master.txt"))
+	t.Run("bad_name", mustNotExist(defaultCheckout, "must_not_exist", "master"))
+	t.Run("bad_name_for_master", mustNotExist(defaultCheckout, "on_master.txt", "staging"))
 }

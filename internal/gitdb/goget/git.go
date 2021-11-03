@@ -1,4 +1,4 @@
-package gitdb
+package goget
 
 import (
 	"archive/zip"
@@ -9,6 +9,7 @@ import (
 	"io"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/go-git/go-git/v5/plumbing/transport/client"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
@@ -61,12 +62,19 @@ type GitCheckout struct {
 	tracing   tracing.Tracing
 	repo      *git.Repository
 	log       *log.Logger
-	ref       *plumbing.Reference
 	remoteURL string
 	auth      transport.AuthMethod
+
+	mu sync.RWMutex
+}
+
+func (g *GitCheckout) RemoteURL() string {
+	return g.remoteURL
 }
 
 func (g *GitCheckout) Refresh(ctx context.Context) error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	return g.tracing.StartSpanFromContext(ctx, tracing.SpanConfig{OperationName: "refresh"}, func(ctx context.Context) error {
 		var progress bytes.Buffer
 		g.tracing.AttachTag(ctx, "git.remote_url", g.remoteURL)
@@ -87,13 +95,6 @@ func (g *GitCheckout) AbsPath() string {
 	return g.absPath
 }
 
-func (g *GitCheckout) reference() (*plumbing.Reference, error) {
-	if g.ref != nil {
-		return g.ref, nil
-	}
-	return g.repo.Head()
-}
-
 func (g *GitCheckout) RemoteExists(remote string) bool {
 	r, err := g.repo.Remote(remote)
 	if err != nil {
@@ -102,35 +103,48 @@ func (g *GitCheckout) RemoteExists(remote string) bool {
 	return r != nil
 }
 
-func (g *GitCheckout) WithReference(ctx context.Context, refName string) (*GitCheckout, error) {
-	r, err := g.repo.Reference(plumbing.ReferenceName(refName), true)
+func (g *GitCheckout) GetFile(ctx context.Context, branch string, path string) (io.WriterTo, error) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	branchAsRef := plumbing.NewRemoteReferenceName("origin", branch)
+	r, err := g.repo.Reference(plumbing.ReferenceName(branchAsRef.String()), true)
 	if err != nil {
-		return nil, fmt.Errorf("unable to resolve ref %s: %w", refName, err)
+		return nil, &unknownBranch{branch: branch, wraps: err}
 	}
-	g.log.Debug(ctx, "Switched hash", zap.String("hash", r.Hash().String()))
-	return &GitCheckout{
-		auth:      g.auth,
-		absPath:   g.absPath,
-		remoteURL: g.remoteURL,
-		repo:      g.repo,
-		tracing:   g.tracing,
-		log:       g.log.With(zap.String("ref", refName)),
-		ref:       r,
-	}, nil
+	if err != nil {
+		g.log.Warn(ctx, "invalid branch", zap.Error(err))
+		return nil, err
+	}
+	f, err := g.fileContent(ctx, path, r)
+	if err != nil {
+		return nil, err
+	}
+	var buf bytes.Buffer
+	if _, err := f.WriteTo(&buf); err != nil {
+		return nil, fmt.Errorf("unable to read file contents: %w", err)
+	}
+	return &buf, nil
 }
 
-func (g *GitCheckout) LsFiles(ctx context.Context) ([]string, error) {
+func (g *GitCheckout) LsFiles(ctx context.Context, branch string) ([]string, error) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return g.lsFilesNoLock(ctx, branch)
+}
+
+func (g *GitCheckout) lsFilesNoLock(ctx context.Context, branch string) ([]string, error) {
 	var ret []string
-	err := g.tracing.StartSpanFromContext(ctx, tracing.SpanConfig{OperationName: "ls_files"}, func(ctx context.Context) error {
+	branchAsRef := plumbing.NewRemoteReferenceName("origin", branch)
+	r, err := g.repo.Reference(plumbing.ReferenceName(branchAsRef.String()), true)
+	if err != nil {
+		return nil, &unknownBranch{branch: branch, wraps: err}
+	}
+	err2 := g.tracing.StartSpanFromContext(ctx, tracing.SpanConfig{OperationName: "ls_files"}, func(ctx context.Context) error {
 		g.log.Debug(ctx, "asked to list files")
 		defer g.log.Debug(ctx, "list done")
-		w, err := g.reference()
+		t, err := g.repo.CommitObject(r.Hash())
 		if err != nil {
-			return fmt.Errorf("unable to get repo head: %w", err)
-		}
-		t, err := g.repo.CommitObject(w.Hash())
-		if err != nil {
-			return fmt.Errorf("unable to make tree object for hash %s: %w", w.Hash(), err)
+			return fmt.Errorf("unable to make tree object for hash %s: %w", r.Hash(), err)
 		}
 		iter, err := t.Files()
 		if err != nil {
@@ -145,15 +159,22 @@ func (g *GitCheckout) LsFiles(ctx context.Context) ([]string, error) {
 		}
 		return nil
 	})
-	return ret, err
+	return ret, err2
 }
 
-func ZipContent(ctx context.Context, into io.Writer, prefix string, from *GitCheckout) (int, error) {
+func (g *GitCheckout) ZipContent(ctx context.Context, into io.Writer, prefix string, branch string) (int, error) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
 	w := zip.NewWriter(into)
-	files, err := from.LsFiles(ctx)
+	files, err := g.lsFilesNoLock(ctx, branch)
 	prefix = strings.Trim(prefix, "/")
 	if err != nil {
 		return 0, fmt.Errorf("unable to list files: %w", err)
+	}
+	branchAsRef := plumbing.NewRemoteReferenceName("origin", branch)
+	r, err := g.repo.Reference(plumbing.ReferenceName(branchAsRef.String()), true)
+	if err != nil {
+		return 0, &unknownBranch{branch: branch, wraps: err}
 	}
 	numFiles := 0
 	for _, file := range files {
@@ -165,7 +186,7 @@ func ZipContent(ctx context.Context, into io.Writer, prefix string, from *GitChe
 		if err != nil {
 			return numFiles, fmt.Errorf("unable to create file at path %s: %w", filePath, err)
 		}
-		wt, err := from.FileContent(ctx, file)
+		wt, err := g.fileContent(ctx, file, r)
 		if err != nil {
 			return numFiles, fmt.Errorf("unable to get file content for %s: %w", file, err)
 		}
@@ -186,19 +207,41 @@ type FileStat struct {
 	Hash string
 }
 
-func (g *GitCheckout) LsDir(ctx context.Context, dir string) (retStat []FileStat, retErr error) {
+type unknownBranch struct {
+	branch string
+	wraps  error
+}
+
+func (u *unknownBranch) Error() string {
+	return "unknown branch " + u.branch
+}
+
+func (u *unknownBranch) Unwrap() error {
+	return u.wraps
+}
+
+var ErrUnknownBranch = errors.New("unknown branch")
+
+func (u *unknownBranch) Is(err error) bool {
+	return err == ErrUnknownBranch
+}
+
+func (g *GitCheckout) LsDir(ctx context.Context, dir string, branch string) (retStat []FileStat, retErr error) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
 	g.log.Debug(ctx, "asked to list files")
 	defer func() {
 		g.log.Debug(ctx, "list done", zap.Error(retErr))
 	}()
+	branchAsRef := plumbing.NewRemoteReferenceName("origin", branch)
+	r, err := g.repo.Reference(plumbing.ReferenceName(branchAsRef.String()), true)
+	if err != nil {
+		return nil, &unknownBranch{branch: branch, wraps: err}
+	}
 	retErr = g.tracing.StartSpanFromContext(ctx, tracing.SpanConfig{OperationName: "ls_dir"}, func(ctx context.Context) error {
-		w, err := g.reference()
+		co, err := g.repo.CommitObject(r.Hash())
 		if err != nil {
-			return fmt.Errorf("unable to get repo head: %w", err)
-		}
-		co, err := g.repo.CommitObject(w.Hash())
-		if err != nil {
-			return fmt.Errorf("unable to make commit object for hash %s: %w", w.Hash(), err)
+			return fmt.Errorf("unable to make commit object for hash %s: %w", r.Hash(), err)
 		}
 		t, err := co.Tree()
 		if err != nil {
@@ -228,15 +271,11 @@ func (g *GitCheckout) LsDir(ctx context.Context, dir string) (retStat []FileStat
 }
 
 // Will eventually want to cache this
-func (g *GitCheckout) FileContent(ctx context.Context, fileName string) (io.WriterTo, error) {
+func (g *GitCheckout) fileContent(ctx context.Context, fileName string, w *plumbing.Reference) (io.WriterTo, error) {
 	var ret io.WriterTo
 	err := g.tracing.StartSpanFromContext(ctx, tracing.SpanConfig{OperationName: "file_content"}, func(ctx context.Context) error {
 		g.log.Debug(ctx, "asked to fetch file", zap.String("file_name", fileName))
 		defer g.log.Debug(ctx, "fetch done")
-		w, err := g.reference()
-		if err != nil {
-			return fmt.Errorf("unable to get repo head: %w", err)
-		}
 		t, err := g.repo.CommitObject(w.Hash())
 		if err != nil {
 			return fmt.Errorf("unable to make tree object for hash %s: %w", w.Hash(), err)

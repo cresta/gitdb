@@ -12,13 +12,14 @@ import (
 	"os"
 	"strings"
 
+	"github.com/cresta/gitdb/internal/gitdb/goget"
+
 	jwtmiddleware "github.com/auth0/go-jwt-middleware"
 
 	"github.com/cresta/gitdb/internal/gitdb/tracing"
 	"github.com/cresta/gitdb/internal/httpserver"
 	"github.com/cresta/gitdb/internal/log"
 	"github.com/dgrijalva/jwt-go"
-	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
@@ -42,7 +43,7 @@ type Repository struct {
 
 func NewHandler(logger *log.Logger, cfg Config, tracer tracing.Tracing) (*CheckoutHandler, error) {
 	logger.Info(context.Background(), "setting up git server")
-	g := GitOperator{
+	g := goget.GitOperator{
 		Log:    logger,
 		Tracer: tracer,
 	}
@@ -50,7 +51,7 @@ func NewHandler(logger *log.Logger, cfg Config, tracer tracing.Tracing) (*Checko
 	if dataDir == "" {
 		dataDir = os.TempDir()
 	}
-	gitCheckouts := make(map[string]*GitCheckout)
+	gitCheckouts := make(map[string]*goget.GitCheckout)
 	checkoutConfigs := make(map[string]Repository)
 	ctx := context.Background()
 	for idx, repo := range cfg.Repos {
@@ -88,15 +89,15 @@ func NewHandler(logger *log.Logger, cfg Config, tracer tracing.Tracing) (*Checko
 }
 
 type CheckoutHandler struct {
-	Checkouts       map[string]*GitCheckout
+	Checkouts       map[string]*goget.GitCheckout
 	Log             *log.Logger
 	checkoutConfigs map[string]Repository
 }
 
-func (h *CheckoutHandler) CheckoutsByRepo() map[string]*GitCheckout {
-	ret := make(map[string]*GitCheckout)
+func (h *CheckoutHandler) CheckoutsByRepo() map[string]*goget.GitCheckout {
+	ret := make(map[string]*goget.GitCheckout)
 	for _, c := range h.Checkouts {
-		ret[c.remoteURL] = c
+		ret[c.RemoteURL()] = c
 	}
 	return ret
 }
@@ -231,17 +232,14 @@ func (h *CheckoutHandler) lsDirHandler(req *http.Request) httpserver.CanHTTPWrit
 		logger.Warn(req.Context(), "invalid repo")
 		return &httpserver.BasicResponse{Code: http.StatusNotFound, Msg: buf}
 	}
-	branchAsRef := plumbing.NewRemoteReferenceName("origin", branch)
-	r, err := r.WithReference(req.Context(), branchAsRef.String())
+	stat, err := r.LsDir(req.Context(), dir, branch)
 	if err != nil {
-		logger.Warn(req.Context(), "invalid branch", zap.Error(err))
-		return &httpserver.BasicResponse{
-			Code: http.StatusNotFound,
-			Msg:  strings.NewReader(fmt.Sprintf("unable to find branch %s for repo %s", branch, repo)),
+		if errors.Is(err, goget.ErrUnknownBranch) {
+			return &httpserver.BasicResponse{
+				Code: http.StatusNotFound,
+				Msg:  strings.NewReader(fmt.Sprintf("branch not found %s", branch)),
+			}
 		}
-	}
-	stat, err := r.LsDir(req.Context(), dir)
-	if err != nil {
 		if errors.Is(err, object.ErrDirectoryNotFound) {
 			return &httpserver.BasicResponse{
 				Code: http.StatusNotFound,
@@ -283,17 +281,14 @@ func (h *CheckoutHandler) zipDirHandler(req *http.Request) httpserver.CanHTTPWri
 		logger.Warn(req.Context(), "invalid repo")
 		return &httpserver.BasicResponse{Code: http.StatusNotFound, Msg: buf}
 	}
-	branchAsRef := plumbing.NewRemoteReferenceName("origin", branch)
-	r, err := r.WithReference(req.Context(), branchAsRef.String())
-	if err != nil {
-		logger.Warn(req.Context(), "invalid branch", zap.Error(err))
-		return &httpserver.BasicResponse{
-			Code: http.StatusNotFound,
-			Msg:  strings.NewReader(fmt.Sprintf("unable to find branch %s for repo %s", branch, repo)),
-		}
-	}
 	var buf bytes.Buffer
-	if numFiles, err := ZipContent(req.Context(), &buf, dir, r); err != nil {
+	if numFiles, err := r.ZipContent(req.Context(), &buf, dir, branch); err != nil {
+		if errors.Is(err, goget.ErrUnknownBranch) {
+			return &httpserver.BasicResponse{
+				Code: http.StatusNotFound,
+				Msg:  strings.NewReader(fmt.Sprintf("branch not found %s", branch)),
+			}
+		}
 		logger.Warn(req.Context(), "unable to zip content", zap.Error(err))
 		return &httpserver.BasicResponse{
 			Code: http.StatusInternalServerError,
@@ -315,7 +310,7 @@ func (h *CheckoutHandler) zipDirHandler(req *http.Request) httpserver.CanHTTPWri
 	}
 }
 
-type FileStatArr []FileStat
+type FileStatArr []goget.FileStat
 
 func (f FileStatArr) WriteTo(w io.Writer) (int64, error) {
 	var b bytes.Buffer
@@ -333,17 +328,14 @@ func (h *CheckoutHandler) getFile(ctx context.Context, repo string, branch strin
 		logger.Warn(ctx, "invalid repo")
 		return &httpserver.BasicResponse{Code: http.StatusNotFound, Msg: buf}
 	}
-	branchAsRef := plumbing.NewRemoteReferenceName("origin", branch)
-	r, err := r.WithReference(ctx, branchAsRef.String())
+	f, err := r.GetFile(ctx, branch, path)
 	if err != nil {
-		logger.Warn(ctx, "invalid branch", zap.Error(err))
-		return &httpserver.BasicResponse{
-			Code: http.StatusNotFound,
-			Msg:  strings.NewReader(fmt.Sprintf("unable to find branch %s for repo %s", branch, repo)),
+		if errors.Is(err, goget.ErrUnknownBranch) {
+			return &httpserver.BasicResponse{
+				Code: http.StatusNotFound,
+				Msg:  strings.NewReader(fmt.Sprintf("branch not found %s", branch)),
+			}
 		}
-	}
-	f, err := r.FileContent(ctx, path)
-	if err != nil {
 		if errors.Is(err, object.ErrFileNotFound) {
 			logger.Warn(ctx, "File does not exist", zap.Error(err))
 			return &httpserver.BasicResponse{

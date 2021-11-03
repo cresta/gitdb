@@ -9,6 +9,9 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"time"
+
+	"github.com/cresta/gitdb/internal/gitdb/goget"
 
 	"github.com/gorilla/mux"
 
@@ -84,12 +87,13 @@ func main() {
 }
 
 type Service struct {
-	osExit   func(int)
-	config   config
-	log      *log.Logger
-	onListen func(net.Listener)
-	server   *http.Server
-	tracers  *tracing.Registry
+	osExit     func(int)
+	config     config
+	log        *log.Logger
+	onListen   func(net.Listener)
+	server     *http.Server
+	tracers    *tracing.Registry
+	repoConfig *RepoConfig
 }
 
 var instance = Service{
@@ -111,6 +115,9 @@ func setupLogging() (*log.Logger, error) {
 }
 
 func (m *Service) loadRepoConfig(cfg config) (RepoConfig, error) {
+	if m.repoConfig != nil {
+		return *m.repoConfig, nil
+	}
 	if cfg.RepoConfig == "" {
 		return RepoConfig{}, nil
 	}
@@ -154,7 +161,7 @@ func (m *Service) Main() {
 		return
 	}
 
-	gitdb.WrapGitProtocols(rootTracer)
+	goget.WrapGitProtocols(rootTracer)
 	m.log = m.log.DynamicFields(rootTracer.DynamicFields()...)
 
 	co, err := gitdb.NewHandler(m.log, gitdb.Config{
@@ -184,8 +191,19 @@ func (m *Service) Main() {
 	if m.onListen != nil {
 		m.onListen(ln)
 	}
-
+	onEnd := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-onEnd:
+				return
+			case <-time.After(time.Second * 30):
+				refreshAllRepos(co.CheckoutsByRepo(), m.log)
+			}
+		}
+	}()
 	serveErr := m.server.Serve(ln)
+	close(onEnd)
 	if serveErr != http.ErrServerClosed {
 		m.log.IfErr(serveErr).Error(context.Background(), "server existed")
 	}
@@ -193,6 +211,17 @@ func (m *Service) Main() {
 	shutdownCallback()
 	if serveErr != nil {
 		m.osExit(1)
+	}
+}
+
+func refreshAllRepos(checkouts map[string]*goget.GitCheckout, logger *log.Logger) {
+	ctx1 := context.Background()
+	ctx, onCancel := context.WithTimeout(ctx1, time.Second*60)
+	defer onCancel()
+	for _, c := range checkouts {
+		if err := c.Refresh(ctx); err != nil {
+			logger.Warn(ctx, "unable to refresh repo")
+		}
 	}
 }
 
