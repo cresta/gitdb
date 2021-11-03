@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/cresta/gitdb/internal/gitdb/goget"
+
 	"github.com/cresta/gitdb/internal/gitdb/tracing"
 
 	"github.com/cresta/gitdb/internal/gitdb"
@@ -43,7 +45,7 @@ func Setup(pushToken string, logger *log.Logger, handler *gitdb.CheckoutHandler,
 	return ret
 }
 
-func uselessCasting(in map[string]*gitdb.GitCheckout) map[string]GitCheckout {
+func uselessCasting(in map[string]*goget.GitCheckout) map[string]GitCheckout {
 	ret := make(map[string]GitCheckout)
 	for k, v := range in {
 		ret[k] = v
