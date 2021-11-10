@@ -30,7 +30,7 @@ jobs:
         run:  ct install --all
       - name: Wait for deployment to finish
         timeout-minutes: 1
-        run:  sleep 10 && kubectl logs deployment/gitdb && kubectl rollout status --watch deployment/gitdb
+        run:  kubectl rollout status --watch deployment/gitdb
       - name: Test helm chart
         run:  helm test gitdb
       - name: Remove helm chart
