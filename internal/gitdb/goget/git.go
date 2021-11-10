@@ -65,7 +65,7 @@ type GitCheckout struct {
 	remoteURL string
 	auth      transport.AuthMethod
 
-	mu sync.RWMutex
+	mu sync.Mutex
 }
 
 func (g *GitCheckout) RemoteURL() string {
@@ -104,8 +104,8 @@ func (g *GitCheckout) RemoteExists(remote string) bool {
 }
 
 func (g *GitCheckout) GetFile(ctx context.Context, branch string, path string) (io.WriterTo, error) {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	branchAsRef := plumbing.NewRemoteReferenceName("origin", branch)
 	r, err := g.repo.Reference(plumbing.ReferenceName(branchAsRef.String()), true)
 	if err != nil {
@@ -127,8 +127,8 @@ func (g *GitCheckout) GetFile(ctx context.Context, branch string, path string) (
 }
 
 func (g *GitCheckout) LsFiles(ctx context.Context, branch string) ([]string, error) {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	return g.lsFilesNoLock(ctx, branch)
 }
 
@@ -163,8 +163,8 @@ func (g *GitCheckout) lsFilesNoLock(ctx context.Context, branch string) ([]strin
 }
 
 func (g *GitCheckout) ZipContent(ctx context.Context, into io.Writer, prefix string, branch string) (int, error) {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	w := zip.NewWriter(into)
 	files, err := g.lsFilesNoLock(ctx, branch)
 	prefix = strings.Trim(prefix, "/")
@@ -227,8 +227,8 @@ func (u *unknownBranch) Is(err error) bool {
 }
 
 func (g *GitCheckout) LsDir(ctx context.Context, dir string, branch string) (retStat []FileStat, retErr error) {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	g.log.Debug(ctx, "asked to list files")
 	defer func() {
 		g.log.Debug(ctx, "list done", zap.Error(retErr))
