@@ -20,18 +20,17 @@ jobs:
         run: |
           git config user.name "$GITHUB_ACTOR"
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
-      - name: Run chart-testing (lint)
-        id: lint
+      - name: Set up chart-testing
         uses: helm/chart-testing-action@v2.1.0
-        with:
-          command: lint
+      - name: Run chart-testing (lint)
+        run: ct lint
       - name: Create kind cluster
         uses: helm/kind-action@v1.2.0
       - name: Install helm chart
-        run:  helm install gitdb ./charts/gitdb
+        run:  ct install
       - name: Wait for deployment to finish
         timeout-minutes: 1
-        run:  kubectl rollout status --watch deployment/gitdb
+        run:  sleep 10 && kubectl logs deployment/gitdb && kubectl rollout status --watch deployment/gitdb
       - name: Test helm chart
         run:  helm test gitdb
       - name: Remove helm chart
