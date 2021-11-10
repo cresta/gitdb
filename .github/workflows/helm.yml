@@ -28,13 +28,6 @@ jobs:
         uses: helm/kind-action@v1.2.0
       - name: Install helm chart
         run:  ct install --all
-      - name: Wait for deployment to finish
-        timeout-minutes: 1
-        run:  kubectl rollout status --watch deployment/gitdb
-      - name: Test helm chart
-        run:  helm test gitdb
-      - name: Remove helm chart
-        run:  helm uninstall gitdb
       - name: Run chart-releaser
         uses: helm/chart-releaser-action@v1.2.1
         env:
