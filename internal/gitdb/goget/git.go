@@ -10,9 +10,11 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/go-git/go-git/v5/plumbing/transport/client"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
+	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/cresta/gitdb/internal/gitdb/tracing"
 
@@ -44,11 +46,16 @@ func (g *GitOperator) Clone(ctx context.Context, into string, remoteURL string, 
 			return err
 		}
 		g.Log.Debug(ctx, "clone finished", zap.Stringer("progress", &progress))
+		c, err := lru.New(1000)
+		if err != nil {
+			return fmt.Errorf("unable to create cache: %w", err)
+		}
 		ret = &GitCheckout{
 			repo:      repo,
 			absPath:   into,
 			auth:      auth,
 			tracing:   g.Tracer,
+			cache:     c,
 			remoteURL: remoteURL,
 			log:       g.Log.With(zap.String("repo", remoteURL)),
 		}
@@ -64,8 +71,17 @@ type GitCheckout struct {
 	log       *log.Logger
 	remoteURL string
 	auth      transport.AuthMethod
+	cache     CheckoutCache
 
 	mu sync.Mutex
+}
+
+var _ CheckoutCache = &lru.Cache{}
+
+type CheckoutCache interface {
+	Get(key interface{}) (interface{}, bool)
+	Add(key interface{}, b interface{}) bool
+	Remove(key interface{}) (present bool)
 }
 
 func (g *GitCheckout) RemoteURL() string {
@@ -103,7 +119,35 @@ func (g *GitCheckout) RemoteExists(remote string) bool {
 	return r != nil
 }
 
+type getFileCacheKey struct {
+	branch string
+	path   string
+}
+
+type getFileCacheValue struct {
+	data         string
+	creationTime time.Time
+}
+
 func (g *GitCheckout) GetFile(ctx context.Context, branch string, path string) (io.WriterTo, error) {
+	cacheKey := getFileCacheKey{branch, path}
+	if item, exists := g.cache.Get(cacheKey); exists {
+		if v, ok := item.(getFileCacheValue); ok {
+			g.tracing.AttachTag(ctx, "cache.hit", true)
+			if time.Since(v.creationTime) > time.Minute*15 {
+				g.log.Debug(ctx, "old cache hit")
+				g.cache.Remove(cacheKey)
+			} else {
+				g.log.Debug(ctx, "cache hit")
+				var buf bytes.Buffer
+				if _, err := io.WriteString(&buf, v.data); err != nil {
+					return nil, fmt.Errorf("unable to write to buffer: %w", err)
+				}
+				return &buf, nil
+			}
+		}
+	}
+	g.tracing.AttachTag(ctx, "cache.hit", false)
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	branchAsRef := plumbing.NewRemoteReferenceName("origin", branch)
@@ -123,6 +167,14 @@ func (g *GitCheckout) GetFile(ctx context.Context, branch string, path string) (
 	if _, err := f.WriteTo(&buf); err != nil {
 		return nil, fmt.Errorf("unable to read file contents: %w", err)
 	}
+	if buf.Len() > 100_000 {
+		return &buf, nil
+	}
+	var cacheBuf bytes.Buffer
+	if _, err := io.WriteString(&cacheBuf, buf.String()); err != nil {
+		return nil, fmt.Errorf("unable to copy file contents to cache: %w", err)
+	}
+	g.cache.Add(getFileCacheKey{branch, path}, getFileCacheValue{data: cacheBuf.String(), creationTime: time.Now()})
 	return &buf, nil
 }
 
