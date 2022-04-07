@@ -134,7 +134,7 @@ func (g *GitCheckout) GetFile(ctx context.Context, branch string, path string) (
 	if item, exists := g.cache.Get(cacheKey); exists {
 		if v, ok := item.(getFileCacheValue); ok {
 			g.tracing.AttachTag(ctx, "cache.hit", true)
-			if time.Since(v.creationTime) > time.Minute*15 {
+			if time.Since(v.creationTime) > time.Minute*2 {
 				g.log.Debug(ctx, "old cache hit")
 				g.cache.Remove(cacheKey)
 			} else {
