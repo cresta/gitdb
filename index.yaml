@@ -3,6 +3,18 @@ entries:
   gitdb:
   - apiVersion: v2
     appVersion: 0.0.18
+    created: "2022-04-19T05:19:13.373781374Z"
+    description: A Helm chart for Kubernetes
+    digest: df2892f8ee92cf08dc4c361f443a60465b26260845e33314698c9ae7e47d76a7
+    maintainers:
+    - name: Jack
+    name: gitdb
+    type: application
+    urls:
+    - https://github.com/cresta/gitdb/releases/download/gitdb-0.1.29/gitdb-0.1.29.tgz
+    version: 0.1.29
+  - apiVersion: v2
+    appVersion: 0.0.18
     created: "2022-04-19T04:59:07.378389137Z"
     description: A Helm chart for Kubernetes
     digest: 062c671bda34e4a378a699284555fa9f2e3f2b0ede48d006db06e2b58c9c8110
@@ -235,4 +247,4 @@ entries:
     urls:
     - https://github.com/cresta/gitdb/releases/download/gitdb-0.1.0/gitdb-0.1.0.tgz
     version: 0.1.0
-generated: "2022-04-19T04:59:07.378726661Z"
+generated: "2022-04-19T05:19:13.373981775Z"
