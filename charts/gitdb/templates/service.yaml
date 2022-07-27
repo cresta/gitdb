@@ -4,6 +4,9 @@ metadata:
   name: {{ include "gitdb.fullname" . }}
   labels:
     {{- include "gitdb.labels" . | nindent 4 }}
+    {{- if .Values.service.labels }}
+      {{- toYaml .Values.service.labels | nindent 4 }}
+    {{- end }}
 spec:
   type: {{ .Values.service.type }}
   ports:

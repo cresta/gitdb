@@ -60,6 +60,10 @@ securityContext: {}
   # runAsUser: 1000
 
 service:
+  # Labels to add that are specific for the service.
+  # Used for linkerd-multicluster.
+  labels: {}
+    # mirror.linkerd.io/exported: "true"
   type: ClusterIP
   port: 80
 
