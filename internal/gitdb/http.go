@@ -7,15 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
 
-	"github.com/cresta/gitdb/internal/gitdb/goget"
-
 	jwtmiddleware "github.com/auth0/go-jwt-middleware"
-
+	"github.com/cresta/gitdb/internal/gitdb/goget"
 	"github.com/cresta/gitdb/internal/gitdb/tracing"
 	"github.com/cresta/gitdb/internal/httpserver"
 	"github.com/cresta/gitdb/internal/log"
@@ -59,7 +56,7 @@ func NewHandler(logger *log.Logger, cfg Config, tracer tracing.Tracing) (*Checko
 		if trimmedRepoURL == "" {
 			return nil, fmt.Errorf("unable to find URL for repo index %d", idx)
 		}
-		cloneInto, err := ioutil.TempDir(dataDir, "gitdb_repo_"+sanitizeDir(trimmedRepoURL))
+		cloneInto, err := os.MkdirTemp(dataDir, "gitdb_repo_"+sanitizeDir(trimmedRepoURL))
 		if err != nil {
 			return nil, fmt.Errorf("unable to make temp dir for %s,%s: %w", dataDir, "gitdb_repo_"+sanitizeDir(trimmedRepoURL), err)
 		}
@@ -371,7 +368,7 @@ func getAuthMethod(repo Repository) (transport.AuthMethod, error) {
 	if pKey == "" {
 		return nil, nil
 	}
-	sshKey, err := ioutil.ReadFile(pKey)
+	sshKey, err := os.ReadFile(pKey)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read file %s: %w", pKey, err)
 	}
