@@ -332,7 +332,8 @@ func setupServer(cfg config, z *log.Logger, rootTracer tracing.Tracing, coHandle
 	rootMux.NotFoundHandler = httpserver.NotFoundHandler(z)
 	rootMux.Use(tracing.MuxTagging(rootTracer))
 	return &http.Server{
-		Handler: rootHandler,
-		Addr:    cfg.ListenAddr,
+		Handler:           rootHandler,
+		Addr:              cfg.ListenAddr,
+		ReadHeaderTimeout: time.Second * 30,
 	}
 }
