@@ -5,28 +5,21 @@ import (
 	"crypto/rsa"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
 	"time"
 
+	"github.com/cresta/gitdb/internal/gitdb"
 	"github.com/cresta/gitdb/internal/gitdb/goget"
-
-	"github.com/gorilla/mux"
-
-	"github.com/dgrijalva/jwt-go"
-
-	"github.com/cresta/gitdb/internal/gitdb/tracing/datadog"
-	"github.com/signalfx/golib/v3/httpdebug"
-
+	"github.com/cresta/gitdb/internal/gitdb/repoprovider/github"
 	"github.com/cresta/gitdb/internal/gitdb/tracing"
+	"github.com/cresta/gitdb/internal/gitdb/tracing/datadog"
 	"github.com/cresta/gitdb/internal/httpserver"
 	"github.com/cresta/gitdb/internal/log"
-
-	"github.com/cresta/gitdb/internal/gitdb/repoprovider/github"
-
-	"github.com/cresta/gitdb/internal/gitdb"
+	"github.com/dgrijalva/jwt-go"
+	"github.com/gorilla/mux"
+	"github.com/signalfx/golib/v3/httpdebug"
 	"go.uber.org/zap"
 )
 
@@ -121,7 +114,7 @@ func (m *Service) loadRepoConfig(cfg config) (RepoConfig, error) {
 	if cfg.RepoConfig == "" {
 		return RepoConfig{}, nil
 	}
-	b, err := ioutil.ReadFile(cfg.RepoConfig)
+	b, err := os.ReadFile(cfg.RepoConfig)
 	if err != nil {
 		return RepoConfig{}, fmt.Errorf("unable to read file %s: %w", cfg.RepoConfig, err)
 	}
@@ -256,7 +249,7 @@ func setupJWT(cfg config, m *mux.Router, h *gitdb.CheckoutHandler, logger *log.L
 		logger.Info(context.Background(), "skipping public JWT handler: no public key")
 		return nil
 	}
-	fileContent, err := ioutil.ReadFile(cfg.JWTPublicKey)
+	fileContent, err := os.ReadFile(cfg.JWTPublicKey)
 	if err != nil {
 		return fmt.Errorf("unable to read jwt file %s: %w", cfg.JWTPublicKey, err)
 	}
@@ -284,7 +277,7 @@ func setupJWTSigning(ctx context.Context, cfg config, log *log.Logger, m *mux.Ro
 		log.Info(ctx, "no private key set.  Skipping JWT signing step")
 		return nil
 	}
-	fileContent, err := ioutil.ReadFile(cfg.JWTPrivateKey)
+	fileContent, err := os.ReadFile(cfg.JWTPrivateKey)
 	if err != nil {
 		return fmt.Errorf("unable to read private key file %s: %w", cfg.JWTPrivateKey, err)
 	}
