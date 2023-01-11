@@ -1,6 +1,12 @@
 name: Build Project
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
 
 jobs:
   build:
@@ -9,29 +15,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
-        uses: actions/checkout@v2
-      - name: Set up Go
-        uses: actions/setup-go@v2
+        uses: actions/checkout@v3
+      - name: Install Go
+        uses: actions/setup-go@v3
         with:
-          go-version: 1.17.3
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+          cache: true
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
         id: buildx
         with:
           install: true
       - name: Log into GHCR
         if: github.event_name == 'push'
-        uses: magefile/mage-action@v1
+        uses: magefile/mage-action@v2
         with:
-          version: latest
           args: ghcr:login
         env:
           GHCR_PAT: ${{ secrets.GHCR_PAT }}
       - name: Build image
         if: github.event_name == 'pull_request'
-        uses: magefile/mage-action@v1
+        uses: magefile/mage-action@v2
         with:
-          version: latest
           args: -v docker:build
       - name: Build and Push image
         if: github.event_name == 'push'
@@ -47,28 +53,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
-        uses: actions/checkout@v2
-      - name: Set up Go
-        uses: actions/setup-go@v2
+        uses: actions/checkout@v3
+      - name: Install Go
+        uses: actions/setup-go@v3
         with:
-          go-version: 1.17.3
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+          cache: true
       - name: Run tests
-        uses: magefile/mage-action@v1
+        uses: magefile/mage-action@v2
         with:
-          version: latest
           args: go:test
   go_lint:
     name: Run go lints
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
-        uses: actions/checkout@v2
-      - name: Set up Go
-        uses: actions/setup-go@v2
+        uses: actions/checkout@v3
+      - name: Install Go
+        uses: actions/setup-go@v3
         with:
-          go-version: 1.17.3
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+          cache: true
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v2
+        uses: golangci/golangci-lint-action@v3
         with:
           version: latest
   hadolint:
@@ -76,7 +85,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
-        uses: actions/checkout@v1
+        uses: actions/checkout@v3
       - name: hadolint
         uses: reviewdog/action-hadolint@v1
         with:
