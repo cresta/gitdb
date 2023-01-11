@@ -131,15 +131,15 @@ func (f *FieldLogger) Log(keyvals ...interface{}) {
 		if i+1 >= len(keyvals) {
 			continue
 		}
-		kInt := keyvals[i]
+		keyInt := keyvals[i]
 		v := keyvals[i+1]
-		if kAsString, ok := kInt.(string); ok {
-			if kAsString == "msg" {
+		if keyAsString, ok := keyInt.(string); ok {
+			if keyAsString == "msg" {
 				if valAsString, ok := v.(string); ok {
 					msg = valAsString
 				}
 			} else {
-				fields = append(fields, zap.Any(kAsString, v))
+				fields = append(fields, zap.Any(keyAsString, v))
 			}
 		}
 	}
