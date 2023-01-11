@@ -41,7 +41,7 @@ jobs:
           args: -v docker:build
       - name: Build and Push image
         if: github.event_name == 'push'
-        uses: magefile/mage-action@v1
+        uses: magefile/mage-action@v2
         with:
           version: latest
           args: -v docker:build
