@@ -3,7 +3,8 @@ module github.com/cresta/gitdb
 go 1.19
 
 require (
-	github.com/auth0/go-jwt-middleware v0.0.0-20200810150920-a32d7af194d1
+	github.com/auth0/go-jwt-middleware v1.0.1
+	github.com/auth0/go-jwt-middleware/v2 v2.1.0
 	github.com/cresta/magehelper v0.0.30
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/go-git/go-git/v5 v5.1.0
@@ -29,6 +30,7 @@ require (
 	github.com/dgraph-io/ristretto v0.1.0 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/emirpasic/gods v1.12.0 // indirect
+	github.com/form3tech-oss/jwt-go v3.2.2+incompatible // indirect
 	github.com/go-git/gcfg v1.5.0 // indirect
 	github.com/go-git/go-billy/v5 v5.0.0 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
