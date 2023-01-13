@@ -9,7 +9,8 @@ require (
 	github.com/go-git/go-git/v5 v5.1.0
 	github.com/google/go-github/v32 v32.1.0
 	github.com/gorilla/mux v1.8.0
-	github.com/hashicorp/golang-lru v0.6.0
+	github.com/hashicorp/golang-lru v0.5.4
+	github.com/hashicorp/golang-lru/v2 v2.0.1
 	github.com/signalfx/golib/v3 v3.3.47
 	github.com/stretchr/testify v1.8.1
 	go.uber.org/zap v1.24.0
