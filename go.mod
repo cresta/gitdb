@@ -1,6 +1,6 @@
 module github.com/cresta/gitdb
 
-go 1.19
+go 1.20
 
 require (
 	github.com/auth0/go-jwt-middleware v0.0.0-20200810150920-a32d7af194d1
