@@ -10,7 +10,7 @@ require (
 	github.com/google/go-github/v32 v32.1.0
 	github.com/gorilla/mux v1.8.0
 	github.com/hashicorp/golang-lru v0.6.0
-	github.com/signalfx/golib/v3 v3.3.47
+	github.com/signalfx/golib/v3 v3.3.48
 	github.com/stretchr/testify v1.8.1
 	go.uber.org/zap v1.24.0
 	gopkg.in/DataDog/dd-trace-go.v1 v1.47.0
@@ -51,7 +51,7 @@ require (
 	github.com/sergi/go-diff v1.1.0 // indirect
 	github.com/tinylib/msgp v1.1.6 // indirect
 	github.com/xanzy/ssh-agent v0.2.1 // indirect
-	go.uber.org/atomic v1.9.0 // indirect
+	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
 	go4.org/intern v0.0.0-20211027215823-ae77deb06f29 // indirect
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20220617031537-928513b29760 // indirect
@@ -60,7 +60,7 @@ require (
 	golang.org/x/sys v0.3.0 // indirect
 	golang.org/x/time v0.0.0-20211116232009-f0f3c7e86c11 // indirect
 	golang.org/x/xerrors v0.0.0-20220517211312-f3a8303e98df // indirect
-	google.golang.org/grpc v1.48.0 // indirect
+	google.golang.org/grpc v1.49.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
