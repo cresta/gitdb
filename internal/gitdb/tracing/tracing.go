@@ -52,7 +52,7 @@ var _ Tracing = Noop{}
 
 type Noop struct{}
 
-func (n Noop) StartSpanFromContext(ctx context.Context, cfg SpanConfig, callback func(ctx context.Context) error) error {
+func (n Noop) StartSpanFromContext(ctx context.Context, _ SpanConfig, callback func(ctx context.Context) error) error {
 	return callback(ctx)
 }
 
@@ -60,7 +60,7 @@ func (n Noop) WrapRoundTrip(rt http.RoundTripper) http.RoundTripper {
 	return rt
 }
 
-func (n Noop) AttachTag(ctx context.Context, key string, value interface{}) {
+func (n Noop) AttachTag(_ context.Context, _ string, _ interface{}) {
 }
 
 func (n Noop) DynamicFields() []log.DynamicFields {
