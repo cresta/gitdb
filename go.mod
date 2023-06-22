@@ -8,6 +8,7 @@ require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/go-git/go-git/v5 v5.7.0
 	github.com/google/go-github/v32 v32.1.0
+	github.com/google/go-github/v53 v53.2.0
 	github.com/gorilla/mux v1.8.0
 	github.com/hashicorp/golang-lru v0.6.0
 	github.com/signalfx/golib/v3 v3.3.50
