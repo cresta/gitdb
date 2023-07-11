@@ -1,4 +1,4 @@
-FROM golang:1.20.5 AS builder
+FROM golang:1.20.6 AS builder
 # hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
