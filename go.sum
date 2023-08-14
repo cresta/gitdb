@@ -141,8 +141,8 @@ github.com/sethvargo/go-envconfig v0.8.3 h1:dXyUrDCJvCm3ybP7yNpiux93qoSORvuH23bd
 github.com/sethvargo/go-envconfig v0.8.3/go.mod h1:Iz1Gy1Sf3T64TQlJSvee81qDhf7YIlt8GMUX6yyNFs0=
 github.com/sethvargo/go-githubactions v1.1.0 h1:mg03w+b+/s5SMS298/2G6tHv8P0w0VhUFaqL1THIqzY=
 github.com/sethvargo/go-githubactions v1.1.0/go.mod h1:qIboSF7yq2Qnaw2WXDsqCReM0Lo1gU4QXUWmhBC3pxE=
-github.com/signalfx/golib/v3 v3.3.51 h1:jCosCSXp2eFlfIYPyP8kprzmd7uAwhcC8JE6PYb54Rg=
-github.com/signalfx/golib/v3 v3.3.51/go.mod h1:4WXAd7TCKXRR6xKj7N/y2NiiCbzMpW3PjU4AFu2TUSc=
+github.com/signalfx/golib/v3 v3.3.52 h1:VRwn4mt++nVhc6yn6HED2mBOyz+7YqLtt9PjqSjxEE8=
+github.com/signalfx/golib/v3 v3.3.52/go.mod h1:lgdUNXjNnZkgEhQFSbfyek4oFUG8t1APhGaitZsSBzc=
 github.com/sirupsen/logrus v1.7.0/go.mod h1:yWOB1SBYBC5VeMP7gHvWumXLIWorT60ONWic61uBYv0=
 github.com/skeema/knownhosts v1.2.0 h1:h9r9cf0+u7wSE+M183ZtMGgOJKiL96brpaz5ekfJCpM=
 github.com/skeema/knownhosts v1.2.0/go.mod h1:g4fPeYpque7P0xefxtGzV81ihjC8sX2IqpAoNkjxbMo=
@@ -280,7 +280,7 @@ golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1/go.mod h1:I/5z698sn9Ka8T
 golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 h1:H2TDz8ibqkAF6YGhCdN3jS9O0/s90v0rJh3X/OLHEUk=
 golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2/go.mod h1:K8+ghG5WaK9qNqU5K3HdILfMLy1f3aNYFI/wnl100a8=
 google.golang.org/appengine v1.1.0/go.mod h1:EbEs0AVv82hx2wNQdGPgUI5lhzA/G0D9YwlJXL52JkM=
-google.golang.org/grpc v1.56.1 h1:z0dNfjIl0VpaZ9iSVjA6daGatAYwPGstTjt5vkRMFkQ=
+google.golang.org/grpc v1.54.0 h1:EhTqbhiYeixwWQtAEZAxmV9MGqcjEU2mFx52xCzNyag=
 google.golang.org/protobuf v1.26.0-rc.1/go.mod h1:jlhhOSvTdKEhbULTjvd4ARK9grFBp09yW+WbY/TyQbw=
 google.golang.org/protobuf v1.26.0/go.mod h1:9q0QmTI4eRPtz6boOQmLYwt+qCgq0jsYwAQnmE0givc=
 google.golang.org/protobuf v1.27.1/go.mod h1:9q0QmTI4eRPtz6boOQmLYwt+qCgq0jsYwAQnmE0givc=
