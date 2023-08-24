@@ -7,7 +7,7 @@ require (
 	github.com/cresta/magehelper v0.1.0
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/go-git/go-git/v5 v5.8.1
-	github.com/google/go-github/v32 v32.1.0
+	github.com/google/go-github/v54 v54.0.0
 	github.com/google/go-github/v54 v54.0.0
 	github.com/gorilla/mux v1.8.0
 	github.com/hashicorp/golang-lru v0.6.0
