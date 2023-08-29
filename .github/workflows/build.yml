@@ -33,7 +33,7 @@ jobs:
         with:
           args: ghcr:login
         env:
-          GHCR_PAT: ${{ secrets.GHCR_PAT }}
+          GHCR_PAT: ${{ secrets.GITHUB_TOKEN }}
       - name: Build image
         if: github.event_name == 'pull_request'
         uses: magefile/mage-action@v2
