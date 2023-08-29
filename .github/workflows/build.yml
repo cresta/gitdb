@@ -27,13 +27,13 @@ jobs:
         id: buildx
         with:
           install: true
-      - name: Log into GHCR
+      - name: Login to GitHub Container Registry
         if: github.event_name == 'push'
-        uses: magefile/mage-action@v2
+        uses: docker/login-action@v2
         with:
-          args: ghcr:login
-        env:
-          GHCR_PAT: ${{ secrets.GITHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build image
         if: github.event_name == 'pull_request'
         uses: magefile/mage-action@v2
