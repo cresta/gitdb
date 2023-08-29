@@ -28,26 +28,28 @@ jobs:
         with:
           install: true
       - name: Login to GitHub Container Registry
-        if: github.event_name == 'push'
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build image
-        if: github.event_name == 'pull_request'
-        uses: magefile/mage-action@v2
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v4
         with:
-          args: -v docker:build
-      - name: Build and Push image
-        if: github.event_name == 'push'
-        uses: magefile/mage-action@v2
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=ref,event=pr
+          images: |
+            ghcr.io/cresta/gitdb
+      - name: Build and push
+        uses: docker/build-push-action@v4
         with:
-          version: latest
-          args: -v docker:build
-        env:
-          DOCKER_PUSH_REMOTE_CACHE: true
-          DOCKER_PUSH: true
+          push: ${{ github.ref == 'refs/heads/master' }}
+          platforms: linux/amd64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
   go_test:
     name: Run go tests
     runs-on: ubuntu-latest
