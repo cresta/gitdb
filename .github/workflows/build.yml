@@ -39,6 +39,8 @@ jobs:
         with:
           tags: |
             type=ref,event=branch
+            type=ref,event=tag
+            type=ref,event=pr
           images: |
             ghcr.io/cresta/gitdb
       - name: Build and push
