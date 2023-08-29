@@ -15,7 +15,7 @@ import (
 
 	"github.com/cresta/gitdb/internal/log"
 
-	"github.com/google/go-github/v32/github"
+	"github.com/google/go-github/v54/github"
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 )
