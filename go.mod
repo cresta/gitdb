@@ -10,7 +10,7 @@ require (
 	github.com/google/go-github/v54 v54.0.0
 	github.com/gorilla/mux v1.8.0
 	github.com/hashicorp/golang-lru v0.6.0
-	github.com/signalfx/golib/v3 v3.3.52
+	github.com/signalfx/golib/v3 v3.3.53
 	github.com/stretchr/testify v1.8.4
 	go.uber.org/zap v1.25.0
 	gopkg.in/DataDog/dd-trace-go.v1 v1.54.0
