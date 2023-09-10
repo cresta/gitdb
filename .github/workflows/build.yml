@@ -65,7 +65,7 @@ jobs:
           cache-dependency-path: go.sum
           cache: true
       - name: Run tests
-        uses: magefile/mage-action@v2
+        uses: magefile/mage-action@v3
         with:
           args: go:test
   go_lint:
