@@ -13,7 +13,7 @@ require (
 	github.com/signalfx/golib/v3 v3.3.53
 	github.com/stretchr/testify v1.8.4
 	go.uber.org/zap v1.26.0
-	gopkg.in/DataDog/dd-trace-go.v1 v1.55.0
+	gopkg.in/DataDog/dd-trace-go.v1 v1.56.0
 )
 
 require (
@@ -43,7 +43,7 @@ require (
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
-	github.com/google/uuid v1.3.0 // indirect
+	github.com/google/uuid v1.3.1 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/magefile/mage v1.15.0 // indirect
