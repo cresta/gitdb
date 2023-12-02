@@ -3,7 +3,7 @@ module github.com/cresta/gitdb
 go 1.20
 
 require (
-	github.com/auth0/go-jwt-middleware v0.0.0-20200810150920-a32d7af194d1
+	github.com/auth0/go-jwt-middleware 3b17ee90d91e
 	github.com/cresta/magehelper v0.1.0
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/go-git/go-git/v5 v5.10.1
