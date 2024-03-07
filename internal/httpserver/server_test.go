@@ -20,7 +20,7 @@ func TestJWTSignIn(t *testing.T) {
 		Auth: func(username string, password string) (bool, error) {
 			return username == "user" && password == "pass", nil
 		},
-		SigningString: func(username string) *rsa.PrivateKey {
+		SigningString: func(_ string) *rsa.PrivateKey {
 			return pk
 		},
 	}
@@ -31,7 +31,7 @@ func TestJWTSignIn(t *testing.T) {
 	j.ServeHTTP(rec, req)
 	require.Equal(t, http.StatusOK, rec.Code)
 
-	tok, err := jwt.Parse(rec.Body.String(), func(token *jwt.Token) (interface{}, error) {
+	tok, err := jwt.Parse(rec.Body.String(), func(_ *jwt.Token) (interface{}, error) {
 		return pk.Public(), nil
 	})
 	require.NoError(t, err)

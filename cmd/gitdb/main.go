@@ -257,7 +257,7 @@ func setupJWT(cfg config, m *mux.Router, h *gitdb.CheckoutHandler, logger *log.L
 	if err != nil {
 		return fmt.Errorf("unable to parse public key in file %s: %w", cfg.JWTPublicKey, err)
 	}
-	keyFunc := func(token *jwt.Token) (interface{}, error) {
+	keyFunc := func(_ *jwt.Token) (interface{}, error) {
 		return parsedPublicKey, nil
 	}
 	h.SetupPublicJWTHandler(m, keyFunc, repoConfig.Repositories)
@@ -300,7 +300,7 @@ func setupJWTSigning(ctx context.Context, cfg config, log *log.Logger, m *mux.Ro
 		Auth: func(username string, password string) (bool, error) {
 			return username == cfg.JWTSignInUsername && password == cfg.JWTSignInPassword, nil
 		},
-		SigningString: func(username string) *rsa.PrivateKey {
+		SigningString: func(_ string) *rsa.PrivateKey {
 			return pKey
 		},
 	}
