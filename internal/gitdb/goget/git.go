@@ -290,7 +290,7 @@ func (g *GitCheckout) LsDir(ctx context.Context, dir string, branch string) (ret
 	if err != nil {
 		return nil, &unknownBranch{branch: branch, wraps: err}
 	}
-	retErr = g.tracing.StartSpanFromContext(ctx, tracing.SpanConfig{OperationName: "ls_dir"}, func(ctx context.Context) error {
+	retErr = g.tracing.StartSpanFromContext(ctx, tracing.SpanConfig{OperationName: "ls_dir"}, func(_ context.Context) error {
 		co, err := g.repo.CommitObject(r.Hash())
 		if err != nil {
 			return fmt.Errorf("unable to make commit object for hash %s: %w", r.Hash(), err)

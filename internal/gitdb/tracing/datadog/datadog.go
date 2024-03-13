@@ -63,14 +63,25 @@ func envToStruct(env []string, into interface{}) error {
 	return json.Unmarshal(b, into)
 }
 
+func verifyFileExistsWithRetry(file string, retries int, delay time.Duration) bool {
+	for i := 0; i < retries; i++ {
+		if fileExists(file) {
+			return true
+		}
+		time.Sleep(delay)
+	}
+	return false
+}
+
 func NewTracer(originalConfig tracing.Config) (tracing.Tracing, error) {
 	var cfg config
 	if err := envToStruct(originalConfig.Env, &cfg); err != nil {
 		return nil, fmt.Errorf("unable to convert env to config: %w", err)
 	}
-	if !fileExists(cfg.apmFile()) {
+	// the datadog APM socket is mounted from the host, sometimes it is not available immediately
+	if !verifyFileExistsWithRetry(cfg.apmFile(), 10, 1*time.Second) {
 		originalConfig.Log.Info(context.Background(), "Unable to find datadog APM file", zap.String("file_name", cfg.apmFile()))
-		return nil, nil
+		return nil, fmt.Errorf("unable to find datadog APM file: %s", cfg.apmFile())
 	}
 	u := &unixRoundTripper{
 		file:        cfg.apmFile(),
