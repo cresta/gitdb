@@ -1,6 +1,8 @@
 module github.com/cresta/gitdb
 
-go 1.20
+go 1.21
+
+toolchain go1.22.5
 
 require (
 	github.com/auth0/go-jwt-middleware v0.0.0-20200810150920-a32d7af194d1
@@ -13,7 +15,7 @@ require (
 	github.com/signalfx/golib/v3 v3.3.53
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.27.0
-	gopkg.in/DataDog/dd-trace-go.v1 v1.65.1
+	gopkg.in/DataDog/dd-trace-go.v1 v1.66.0
 )
 
 require (
@@ -67,13 +69,13 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.21.0 // indirect
-	golang.org/x/mod v0.12.0 // indirect
+	golang.org/x/mod v0.14.0 // indirect
 	golang.org/x/net v0.23.0 // indirect
 	golang.org/x/oauth2 v0.11.0 // indirect
 	golang.org/x/sys v0.20.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
-	golang.org/x/tools v0.13.0 // indirect
-	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
+	golang.org/x/tools v0.16.1 // indirect
+	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
