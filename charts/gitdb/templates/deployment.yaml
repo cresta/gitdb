@@ -73,6 +73,9 @@ spec:
             {{- end }}
             - name: SSH_KNOWN_HOSTS
               value: /etc/ssh/ssh_known_hosts
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           ports:
             - name: http
               containerPort: 8080
