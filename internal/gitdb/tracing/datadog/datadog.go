@@ -51,7 +51,7 @@ func (c *config) statsFile() string {
 func envToStruct(env []string, into interface{}) error {
 	m := make(map[string]string)
 	for _, e := range env {
-		p := strings.SplitN(e, "=", 1)
+		p := strings.SplitN(e, "=", 2)
 		if len(p) != 2 {
 			continue
 		}
