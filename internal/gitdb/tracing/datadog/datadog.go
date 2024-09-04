@@ -29,8 +29,9 @@ const ddStatsFile = "/var/run/datadog/dsd.socket"
 var _ tracing.Constructor = NewTracer
 
 type config struct {
-	ApmFile   string `json:"DD_APM_RECEIVER_SOCKET"`
-	StatsFile string `json:"DD_DOGSTATSD_SOCKET"`
+	ApmAddress string `json:"DD_APM_RECEIVER_ADDR"`
+	ApmFile    string `json:"DD_APM_RECEIVER_SOCKET"`
+	StatsFile  string `json:"DD_DOGSTATSD_SOCKET"`
 }
 
 func (c *config) apmFile() string {
@@ -78,19 +79,25 @@ func NewTracer(originalConfig tracing.Config) (tracing.Tracing, error) {
 	if err := envToStruct(originalConfig.Env, &cfg); err != nil {
 		return nil, fmt.Errorf("unable to convert env to config: %w", err)
 	}
-	// the datadog APM socket is mounted from the host, sometimes it is not available immediately
-	if !verifyFileExistsWithRetry(cfg.apmFile(), 10, 1*time.Second) {
-		originalConfig.Log.Info(context.Background(), "Unable to find datadog APM file", zap.String("file_name", cfg.apmFile()))
-		return nil, fmt.Errorf("unable to find datadog APM file: %s", cfg.apmFile())
-	}
-	u := &unixRoundTripper{
-		file:        cfg.apmFile(),
-		dialTimeout: 100 * time.Millisecond,
+
+	var startOptions []tracer.StartOption
+	if cfg.ApmAddress == "" {
+		if !verifyFileExistsWithRetry(cfg.apmFile(), 10, 1*time.Second) {
+			originalConfig.Log.Info(context.Background(), "Unable to find datadog APM file", zap.String("file_name", cfg.apmFile()))
+			return nil, fmt.Errorf("unable to find datadog APM file: %s", cfg.apmFile())
+		}
+		u := &unixRoundTripper{
+			file:        cfg.apmFile(),
+			dialTimeout: 100 * time.Millisecond,
+		}
+		startOptions = append(startOptions, tracer.WithHTTPRoundTripper(u))
+	} else {
+		startOptions = append(startOptions, tracer.WithAgentAddr(cfg.ApmAddress))
 	}
 
-	startOptions := []tracer.StartOption{
-		tracer.WithRuntimeMetrics(), tracer.WithHTTPRoundTripper(u), tracer.WithLogger(ddZappedLogger{originalConfig.Log}),
-	}
+	startOptions = append(startOptions,
+		tracer.WithRuntimeMetrics(), tracer.WithLogger(ddZappedLogger{originalConfig.Log}),
+	)
 	if fileExists(cfg.statsFile()) {
 		startOptions = append(startOptions, tracer.WithDogstatsdAddress("unix://"+cfg.statsFile()))
 	}
