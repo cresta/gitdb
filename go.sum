@@ -184,8 +184,8 @@ github.com/sethvargo/go-envconfig v0.8.3 h1:dXyUrDCJvCm3ybP7yNpiux93qoSORvuH23bd
 github.com/sethvargo/go-envconfig v0.8.3/go.mod h1:Iz1Gy1Sf3T64TQlJSvee81qDhf7YIlt8GMUX6yyNFs0=
 github.com/sethvargo/go-githubactions v1.1.0 h1:mg03w+b+/s5SMS298/2G6tHv8P0w0VhUFaqL1THIqzY=
 github.com/sethvargo/go-githubactions v1.1.0/go.mod h1:qIboSF7yq2Qnaw2WXDsqCReM0Lo1gU4QXUWmhBC3pxE=
-github.com/signalfx/golib/v3 v3.3.53 h1:gJx0JrrHjidpo2md+YLEN+Ws3RLTaCmKYT575ZSTKUo=
-github.com/signalfx/golib/v3 v3.3.53/go.mod h1:lgdUNXjNnZkgEhQFSbfyek4oFUG8t1APhGaitZsSBzc=
+github.com/signalfx/golib/v3 v3.3.54 h1:jUwTnaIXLHT0I1+hXoX0cPLdICIwBjB3e5/NGnnjgJY=
+github.com/signalfx/golib/v3 v3.3.54/go.mod h1:KDQZIYpJ3yXPz/KysPQQEYooWdpq4eQZPsjwKR5secc=
 github.com/sirupsen/logrus v1.7.0/go.mod h1:yWOB1SBYBC5VeMP7gHvWumXLIWorT60ONWic61uBYv0=
 github.com/skeema/knownhosts v1.2.2 h1:Iug2P4fLmDw9f41PB6thxUkNUkJzB5i+1/exaj40L3A=
 github.com/skeema/knownhosts v1.2.2/go.mod h1:xYbVRSPxqBZFrdmDyMmsOs+uX1UZC3nTN3ThzgDxUwo=
