@@ -1,6 +1,6 @@
 module github.com/cresta/gitdb
 
-go 1.21
+go 1.22.0
 
 toolchain go1.23.1
 
@@ -15,7 +15,7 @@ require (
 	github.com/signalfx/golib/v3 v3.3.54
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.27.0
-	gopkg.in/DataDog/dd-trace-go.v1 v1.67.1
+	gopkg.in/DataDog/dd-trace-go.v1 v1.68.0
 )
 
 require (
