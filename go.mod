@@ -15,7 +15,7 @@ require (
 	github.com/signalfx/golib/v3 v3.3.55
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/zap v1.27.0
-	gopkg.in/DataDog/dd-trace-go.v1 v1.70.2
+	gopkg.in/DataDog/dd-trace-go.v1 v1.70.3
 )
 
 require (
