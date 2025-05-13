@@ -81,7 +81,7 @@ jobs:
           cache-dependency-path: go.sum
           cache: true
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v4
+        uses: golangci/golangci-lint-action@v8
         with:
           version: latest
   hadolint:
