@@ -13,7 +13,7 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/hashicorp/golang-lru v1.0.2
 	github.com/signalfx/golib/v3 v3.3.55
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.0
 	go.uber.org/zap v1.27.0
 	gopkg.in/DataDog/dd-trace-go.v1 v1.71.1
 )
