@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/cresta/gitdb/internal/gitdb/tracing"
 	"github.com/cresta/gitdb/internal/log"
@@ -126,12 +126,12 @@ func (j *JWTSignIn) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 		resp.HTTPWrite(request.Context(), writer, j.Logger)
 		return
 	}
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, &jwt.StandardClaims{
-		Audience:  "",
-		ExpiresAt: time.Now().Add(time.Hour).Unix(),
-		IssuedAt:  time.Now().Unix(),
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, &jwt.RegisteredClaims{
+		Audience:  jwt.ClaimStrings{},
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+		IssuedAt:  jwt.NewNumericDate(time.Now()),
 		Issuer:    "gitdb",
-		NotBefore: time.Now().Add(-time.Minute).Unix(),
+		NotBefore: jwt.NewNumericDate(time.Now().Add(-time.Minute)),
 	})
 	s, err := token.SignedString(j.SigningString(user))
 	if err != nil {

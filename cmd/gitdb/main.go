@@ -17,7 +17,7 @@ import (
 	"github.com/cresta/gitdb/internal/gitdb/tracing/datadog"
 	"github.com/cresta/gitdb/internal/httpserver"
 	"github.com/cresta/gitdb/internal/log"
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/mux"
 	"github.com/signalfx/golib/v3/httpdebug"
 	"go.uber.org/zap"
@@ -257,7 +257,7 @@ func setupJWT(cfg config, m *mux.Router, h *gitdb.CheckoutHandler, logger *log.L
 	if err != nil {
 		return fmt.Errorf("unable to parse public key in file %s: %w", cfg.JWTPublicKey, err)
 	}
-	keyFunc := func(_ *jwt.Token) (interface{}, error) {
+	keyFunc := func(_ context.Context) (interface{}, error) {
 		return parsedPublicKey, nil
 	}
 	h.SetupPublicJWTHandler(m, keyFunc, repoConfig.Repositories)

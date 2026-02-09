@@ -11,12 +11,12 @@ import (
 	"os"
 	"strings"
 
-	jwtmiddleware "github.com/auth0/go-jwt-middleware"
+	jwtmiddleware "github.com/auth0/go-jwt-middleware/v3"
+	"github.com/auth0/go-jwt-middleware/v3/validator"
 	"github.com/cresta/gitdb/internal/gitdb/goget"
 	"github.com/cresta/gitdb/internal/gitdb/tracing"
 	"github.com/cresta/gitdb/internal/httpserver"
 	"github.com/cresta/gitdb/internal/log"
-	"github.com/dgrijalva/jwt-go"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
@@ -99,23 +99,43 @@ func (h *CheckoutHandler) CheckoutsByRepo() map[string]*goget.GitCheckout {
 	return ret
 }
 
-func (h *CheckoutHandler) SetupPublicJWTHandler(muxRouter *mux.Router, keyFunc jwt.Keyfunc, repos []Repository) {
+func (h *CheckoutHandler) SetupPublicJWTHandler(muxRouter *mux.Router, keyFunc func(context.Context) (interface{}, error), repos []Repository) {
 	if noPublicRepos(repos) {
 		return
 	}
-	middleware := jwtmiddleware.New(jwtmiddleware.Options{
-		ValidationKeyGetter: keyFunc,
-		SigningMethod:       jwt.SigningMethodRS256,
-		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err string) {
-			resp := httpserver.BasicResponse{
-				Code:    http.StatusUnauthorized,
-				Msg:     strings.NewReader(err),
-				Headers: nil,
-			}
-			h.Log.Warn(r.Context(), "error during JWT", zap.String("err_string", err))
-			resp.HTTPWrite(r.Context(), w, h.Log)
-		},
-	})
+
+	// Create a validator using the v3 validator package
+	jwtValidator, err := validator.New(
+		validator.WithKeyFunc(keyFunc),
+		validator.WithAlgorithm(validator.RS256),
+		validator.WithIssuer("gitdb"),
+	)
+	if err != nil {
+		h.Log.Error(context.Background(), "failed to create JWT validator", zap.Error(err))
+		return
+	}
+
+	// Create an error handler for the v3 middleware
+	errorHandler := func(w http.ResponseWriter, r *http.Request, err error) {
+		errString := err.Error()
+		resp := httpserver.BasicResponse{
+			Code:    http.StatusUnauthorized,
+			Msg:     strings.NewReader(errString),
+			Headers: nil,
+		}
+		h.Log.Warn(r.Context(), "error during JWT", zap.String("err_string", errString))
+		resp.HTTPWrite(r.Context(), w, h.Log)
+	}
+
+	middleware, err := jwtmiddleware.New(
+		jwtmiddleware.WithValidator(jwtValidator),
+		jwtmiddleware.WithErrorHandler(errorHandler),
+	)
+	if err != nil {
+		h.Log.Error(context.Background(), "failed to create JWT middleware", zap.Error(err))
+		return
+	}
+
 	publicRepoMiddleware := func(root http.Handler) http.Handler {
 		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			vars := mux.Vars(request)
@@ -132,9 +152,9 @@ func (h *CheckoutHandler) SetupPublicJWTHandler(muxRouter *mux.Router, keyFunc j
 		})
 	}
 
-	muxRouter.Methods(http.MethodGet).Path("/public/file/{repo}/{branch}/{path:.*}").Handler(publicRepoMiddleware(middleware.Handler(httpserver.BasicHandler(h.getFileHandler, h.Log)))).Name("public_get_file_handler")
-	muxRouter.Methods(http.MethodGet).Path("/public/ls/{repo}/{branch}/{dir:.*}").Handler(publicRepoMiddleware(middleware.Handler(httpserver.BasicHandler(h.lsDirHandler, h.Log)))).Name("public_ls_dir_handler")
-	muxRouter.Methods(http.MethodGet).Path("/public/zip/{repo}/{branch}/{dir:.*}").Handler(publicRepoMiddleware(middleware.Handler(httpserver.BasicHandler(h.zipDirHandler, h.Log)))).Name("public_zip_dir_handler")
+	muxRouter.Methods(http.MethodGet).Path("/public/file/{repo}/{branch}/{path:.*}").Handler(publicRepoMiddleware(middleware.CheckJWT(httpserver.BasicHandler(h.getFileHandler, h.Log)))).Name("public_get_file_handler")
+	muxRouter.Methods(http.MethodGet).Path("/public/ls/{repo}/{branch}/{dir:.*}").Handler(publicRepoMiddleware(middleware.CheckJWT(httpserver.BasicHandler(h.lsDirHandler, h.Log)))).Name("public_ls_dir_handler")
+	muxRouter.Methods(http.MethodGet).Path("/public/zip/{repo}/{branch}/{dir:.*}").Handler(publicRepoMiddleware(middleware.CheckJWT(httpserver.BasicHandler(h.zipDirHandler, h.Log)))).Name("public_zip_dir_handler")
 }
 
 func noPublicRepos(repos []Repository) bool {
