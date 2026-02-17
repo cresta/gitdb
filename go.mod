@@ -5,11 +5,10 @@ go 1.24.0
 toolchain go1.26.0
 
 require (
-	github.com/auth0/go-jwt-middleware v1.0.1
-	github.com/auth0/go-jwt-middleware/v3 v3.0.0
+	github.com/auth0/go-jwt-middleware/v2 v2.2.2
 	github.com/cresta/magehelper v0.2.0
-	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/go-git/go-git/v5 v5.16.5
+	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/go-github/v54 v54.0.0
 	github.com/gorilla/mux v1.8.1
 	github.com/hashicorp/golang-lru v1.0.2
@@ -46,7 +45,6 @@ require (
 	github.com/eapache/queue/v2 v2.0.0-20230407133247-75960ed334e4 // indirect
 	github.com/ebitengine/purego v0.6.0-alpha.5 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
-	github.com/form3tech-oss/jwt-go v3.2.2+incompatible // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
 	github.com/go-git/go-billy/v5 v5.6.2 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect

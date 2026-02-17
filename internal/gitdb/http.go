@@ -11,15 +11,15 @@ import (
 	"os"
 	"strings"
 
-	jwtmiddleware "github.com/auth0/go-jwt-middleware"
+	jwtmiddleware "github.com/auth0/go-jwt-middleware/v2"
 	"github.com/cresta/gitdb/internal/gitdb/goget"
 	"github.com/cresta/gitdb/internal/gitdb/tracing"
 	"github.com/cresta/gitdb/internal/httpserver"
 	"github.com/cresta/gitdb/internal/log"
-	"github.com/dgrijalva/jwt-go"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 )
@@ -103,19 +103,29 @@ func (h *CheckoutHandler) SetupPublicJWTHandler(muxRouter *mux.Router, keyFunc j
 	if noPublicRepos(repos) {
 		return
 	}
-	middleware := jwtmiddleware.New(jwtmiddleware.Options{
-		ValidationKeyGetter: keyFunc,
-		SigningMethod:       jwt.SigningMethodRS256,
-		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err string) {
-			resp := httpserver.BasicResponse{
-				Code:    http.StatusUnauthorized,
-				Msg:     strings.NewReader(err),
-				Headers: nil,
-			}
-			h.Log.Warn(r.Context(), "error during JWT", zap.String("err_string", err))
-			resp.HTTPWrite(r.Context(), w, h.Log)
-		},
-	})
+	validateToken := func(ctx context.Context, tokenString string) (interface{}, error) {
+		token, err := jwt.Parse(tokenString, keyFunc, jwt.WithValidMethods([]string{jwt.SigningMethodRS256.Alg()}))
+		if err != nil {
+			return nil, err
+		}
+		if !token.Valid {
+			return nil, errors.New("invalid token")
+		}
+		return token.Claims, nil
+	}
+	errorHandler := func(w http.ResponseWriter, r *http.Request, err error) {
+		resp := httpserver.BasicResponse{
+			Code:    http.StatusUnauthorized,
+			Msg:     strings.NewReader(err.Error()),
+			Headers: nil,
+		}
+		h.Log.Warn(r.Context(), "error during JWT", zap.String("err_string", err.Error()))
+		resp.HTTPWrite(r.Context(), w, h.Log)
+	}
+	middleware := jwtmiddleware.New(
+		validateToken,
+		jwtmiddleware.WithErrorHandler(errorHandler),
+	)
 	publicRepoMiddleware := func(root http.Handler) http.Handler {
 		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			vars := mux.Vars(request)
@@ -132,9 +142,9 @@ func (h *CheckoutHandler) SetupPublicJWTHandler(muxRouter *mux.Router, keyFunc j
 		})
 	}
 
-	muxRouter.Methods(http.MethodGet).Path("/public/file/{repo}/{branch}/{path:.*}").Handler(publicRepoMiddleware(middleware.Handler(httpserver.BasicHandler(h.getFileHandler, h.Log)))).Name("public_get_file_handler")
-	muxRouter.Methods(http.MethodGet).Path("/public/ls/{repo}/{branch}/{dir:.*}").Handler(publicRepoMiddleware(middleware.Handler(httpserver.BasicHandler(h.lsDirHandler, h.Log)))).Name("public_ls_dir_handler")
-	muxRouter.Methods(http.MethodGet).Path("/public/zip/{repo}/{branch}/{dir:.*}").Handler(publicRepoMiddleware(middleware.Handler(httpserver.BasicHandler(h.zipDirHandler, h.Log)))).Name("public_zip_dir_handler")
+	muxRouter.Methods(http.MethodGet).Path("/public/file/{repo}/{branch}/{path:.*}").Handler(publicRepoMiddleware(middleware.CheckJWT(httpserver.BasicHandler(h.getFileHandler, h.Log)))).Name("public_get_file_handler")
+	muxRouter.Methods(http.MethodGet).Path("/public/ls/{repo}/{branch}/{dir:.*}").Handler(publicRepoMiddleware(middleware.CheckJWT(httpserver.BasicHandler(h.lsDirHandler, h.Log)))).Name("public_ls_dir_handler")
+	muxRouter.Methods(http.MethodGet).Path("/public/zip/{repo}/{branch}/{dir:.*}").Handler(publicRepoMiddleware(middleware.CheckJWT(httpserver.BasicHandler(h.zipDirHandler, h.Log)))).Name("public_zip_dir_handler")
 }
 
 func noPublicRepos(repos []Repository) bool {

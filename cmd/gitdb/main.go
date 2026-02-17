@@ -17,7 +17,7 @@ import (
 	"github.com/cresta/gitdb/internal/gitdb/tracing/datadog"
 	"github.com/cresta/gitdb/internal/httpserver"
 	"github.com/cresta/gitdb/internal/log"
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/mux"
 	"github.com/signalfx/golib/v3/httpdebug"
 	"go.uber.org/zap"

@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/cresta/gitdb/internal/testhelp"
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/require"
 )
 
