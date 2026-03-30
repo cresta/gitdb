@@ -237,8 +237,8 @@ github.com/shoenig/go-m1cpu v0.1.6 h1:nxdKQNcEB6vzgA2E2bvzKIYRuNj7XNJ4S/aRSwKzFt
 github.com/shoenig/go-m1cpu v0.1.6/go.mod h1:1JJMcUBvfNwpq05QDQVAnx3gUHr9IYF7GNg9SUEw2VQ=
 github.com/shoenig/test v0.6.4 h1:kVTaSd7WLz5WZ2IaoM0RSzRsUD+m8wRR+5qvntpn4LU=
 github.com/shoenig/test v0.6.4/go.mod h1:byHiCGXqrVaflBLAMq/srcZIHynQPQgeyvkvXnjqq0k=
-github.com/signalfx/golib/v3 v3.4.2 h1:fcnfVS4yYmlVHEd2UtOORw/+I5AzhaNsct5f5tXDRVk=
-github.com/signalfx/golib/v3 v3.4.2/go.mod h1:LQNW2fyW15zKhD0pIr1P8QJ6G7x7f+am0m+7OWUZNmo=
+github.com/signalfx/golib/v3 v3.4.4 h1:n00WkhhSOk6LRjfT4/6JdIDXk0FF4SEoh4TaLM4abWc=
+github.com/signalfx/golib/v3 v3.4.4/go.mod h1:LQNW2fyW15zKhD0pIr1P8QJ6G7x7f+am0m+7OWUZNmo=
 github.com/sirupsen/logrus v1.7.0/go.mod h1:yWOB1SBYBC5VeMP7gHvWumXLIWorT60ONWic61uBYv0=
 github.com/skeema/knownhosts v1.3.1 h1:X2osQ+RAjK76shCbvhHHHVl3ZlgDm8apHEHFqRjnBY8=
 github.com/skeema/knownhosts v1.3.1/go.mod h1:r7KTdC8l4uxWRyK2TpQZ/1o5HaSzh06ePQNxPwTcfiY=
